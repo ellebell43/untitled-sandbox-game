@@ -4,5 +4,6 @@
 
 [node name="MarchingSquares" type="Node2D" unique_id=622026762]
 script = ExtResource("1_scnbn")
+interpolated = true
 
 [node name="GeneratedMesh" type="MeshInstance2D" parent="." unique_id=853706333]

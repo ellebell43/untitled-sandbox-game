@@ -19,10 +19,10 @@ A few principles baked into the ordering:
 - [x] Generate a 2D scalar field by sampling a noise function over a grid; store one value per grid point
 - [x] Choose an isovalue (threshold) and visualize which grid points are inside vs outside (e.g. colored dots) to confirm the field looks reasonable
 - [x] Find and copy the marching squares lookup table (16 cases)
-- [ ] For each cell, compare its 4 corners to the isovalue and pack the result into a 4-bit case index
-- [ ] Use the case index to find crossed edges; place vertices at edge midpoints (no interpolation yet) and draw the line segments to verify topology
-- [ ] Add linear interpolation along each crossed edge using the two corner values and the isovalue; confirm the contour smooths out
-- [ ] Stop here. Do not weld vertices or optimize the 2D version; it has done its job once the contour renders correctly
+- [x] For each cell, compare its 4 corners to the isovalue and pack the result into a 4-bit case index
+- [x] Use the case index to find crossed edges; place vertices at edge midpoints (no interpolation yet) and draw the line segments to verify topology
+- [x] Add linear interpolation along each crossed edge using the two corner values and the isovalue; confirm the contour smooths out
+- [x] Stop here. Do not weld vertices or optimize the 2D version; it has done its job once the contour renders correctly
 
 ## Phase 2 - 3D correctness on the CPU (marching cubes, single block)
 
