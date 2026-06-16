@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://cg2nh30ktqto7"]
+[gd_scene format=3 uid="uid://cg2nh30ktqto7"]
 
 [ext_resource type="Script" uid="uid://but40cu6qnybu" path="res://scripts/player.gd" id="1_errlg"]
 [ext_resource type="Script" uid="uid://c6wksvmdxl62h" path="res://scripts/terrain-generation/voxel-terrain-chunk-managers.gd" id="2_bl13t"]
@@ -20,31 +20,31 @@ glow_enabled = true
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_iyx0m"]
 
-[node name="Node3D" type="Node3D"]
+[node name="Node3D" type="Node3D" unique_id=1919686337]
 
-[node name="Environment" type="Node3D" parent="."]
+[node name="Environment" type="Node3D" parent="." unique_id=2027325351]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="Environment"]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="Environment" unique_id=932825814]
 transform = Transform3D(-0.8660253, -0.4330128, 0.25000003, -0.16535603, 0.7198998, 0.6740931, -0.47186595, 0.5424428, -0.6950527, 0, 0, 0)
 shadow_enabled = true
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="Environment"]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Environment" unique_id=425310713]
 environment = SubResource("Environment_bl13t")
 
-[node name="Player" type="CharacterBody3D" parent="."]
+[node name="Player" type="CharacterBody3D" parent="." unique_id=121488757]
 collision_layer = 2
 script = ExtResource("1_errlg")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Player"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player" unique_id=441372832]
 mesh = SubResource("CapsuleMesh_bl13t")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=476241006]
 shape = SubResource("CapsuleShape3D_iyx0m")
 
-[node name="Camera3D" type="Camera3D" parent="Player"]
+[node name="Camera3D" type="Camera3D" parent="Player" unique_id=2015568822]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.52482224, -0.46089685)
 
-[node name="VoxelTerrainMesh" type="MeshInstance3D" parent="." node_paths=PackedStringArray("PLAYER")]
+[node name="VoxelTerrainMesh" type="MeshInstance3D" parent="." unique_id=2133176316 node_paths=PackedStringArray("PLAYER")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22324371, 0.207695, 0.023040771)
 script = ExtResource("2_bl13t")
 PLAYER = NodePath("../Player")
