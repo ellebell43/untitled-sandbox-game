@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://0hvsdwi4b6bm"]
+
+[ext_resource type="Texture2D" uid="uid://b041wpsqgkvqs" path="res://assets/sprite-2d/white-circle.png" id="1_410lu"]
+[ext_resource type="Script" uid="uid://dldmniitct1wu" path="res://environment/terrain/2d/point.gd" id="2_upmf6"]
+
+[node name="Point" type="Sprite2D" unique_id=118918435]
+scale = Vector2(0.05, 0.05)
+texture = ExtResource("1_410lu")
+script = ExtResource("2_upmf6")

@@ -15,7 +15,7 @@ A few principles baked into the ordering:
 
 ## Phase 1 - 2D learning pass (marching squares, lightweight, throwaway)
 
-- [ ] Set up a 2D scratch scene where you can draw points, line segments, and text for debugging
+- [x] Set up a 2D scratch scene where you can draw points, line segments, and text for debugging
 - [ ] Generate a 2D scalar field by sampling a noise function over a grid; store one value per grid point
 - [ ] Choose an isovalue (threshold) and visualize which grid points are inside vs outside (e.g. colored dots) to confirm the field looks reasonable
 - [ ] Find and copy the marching squares lookup table (16 cases)
