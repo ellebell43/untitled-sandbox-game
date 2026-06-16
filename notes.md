@@ -16,9 +16,9 @@ A few principles baked into the ordering:
 ## Phase 1 - 2D learning pass (marching squares, lightweight, throwaway)
 
 - [x] Set up a 2D scratch scene where you can draw points, line segments, and text for debugging
-- [ ] Generate a 2D scalar field by sampling a noise function over a grid; store one value per grid point
-- [ ] Choose an isovalue (threshold) and visualize which grid points are inside vs outside (e.g. colored dots) to confirm the field looks reasonable
-- [ ] Find and copy the marching squares lookup table (16 cases)
+- [x] Generate a 2D scalar field by sampling a noise function over a grid; store one value per grid point
+- [x] Choose an isovalue (threshold) and visualize which grid points are inside vs outside (e.g. colored dots) to confirm the field looks reasonable
+- [x] Find and copy the marching squares lookup table (16 cases)
 - [ ] For each cell, compare its 4 corners to the isovalue and pack the result into a 4-bit case index
 - [ ] Use the case index to find crossed edges; place vertices at edge midpoints (no interpolation yet) and draw the line segments to verify topology
 - [ ] Add linear interpolation along each crossed edge using the two corner values and the isovalue; confirm the contour smooths out
@@ -28,7 +28,7 @@ A few principles baked into the ordering:
 
 - [ ] Generate a 3D scalar field by sampling 3D noise over a grid of points
 - [ ] Add a debug view (e.g. draw a dot at each grid point below the threshold) to sanity-check the volume
-- [ ] Find and copy the two marching cubes tables: the edge table and the triangle table (256 cases each)
+- [x] Find and copy the two marching cubes tables: the edge table and the triangle table (256 cases each)
 - [ ] For each cell, compare its 8 corners to the isovalue and pack the result into an 8-bit case index
 - [ ] Use the edge table to find crossed edges, place vertices at edge midpoints first, and emit triangles via the triangle table
 - [ ] Render the triangles unlit to confirm topology is correct before adding interpolation

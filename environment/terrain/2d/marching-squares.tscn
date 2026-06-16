@@ -1,6 +1,8 @@
 [gd_scene format=3 uid="uid://cymm7vuej6hvh"]
 
-[ext_resource type="Script" uid="uid://d3vex8ty8x00j" path="res://environment/terrain/2d/marching_squares.gd" id="1_scnbn"]
+[ext_resource type="Script" uid="uid://d3vex8ty8x00j" path="res://environment/terrain/2d/marching-squares.gd" id="1_scnbn"]
 
 [node name="MarchingSquares" type="Node2D" unique_id=622026762]
 script = ExtResource("1_scnbn")
+
+[node name="GeneratedMesh" type="MeshInstance2D" parent="." unique_id=853706333]
