@@ -18,7 +18,6 @@ var point_scene := preload("res://environment/terrain/2d/point.tscn")
 
 func _ready() -> void:
 	# ====== INITIALIZE DATA ======
-	
 	# Create a noise object to use as a scalar field
 	var scalar := FastNoiseLite.new()
 	scalar.noise_type = FastNoiseLite.TYPE_PERLIN
@@ -78,7 +77,7 @@ func _ready() -> void:
 			if c3 > isosurface: case_index |= (1 << 3)
 			
 			# determine where the vetices go in real space based on segment data and real position of the squares' corners
-			const EDGE_CORNERS := [[0, 1], [1, 2], [2, 3], [3, 0]]  # the two corners each edge connects
+			const EDGE_CORNERS := [[0, 1], [1, 2], [2, 3], [3, 0]] # the two corners each edge connects
 			var segment = MarchingSqauresLUT.SEGMENT_TABLE[case_index]
 			var i := 0
 			while i < segment.size() and segment[i] != -1:

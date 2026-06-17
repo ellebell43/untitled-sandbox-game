@@ -26,16 +26,16 @@ A few principles baked into the ordering:
 
 ## Phase 2 - 3D correctness on the CPU (marching cubes, single block)
 
-- [ ] Generate a 3D scalar field by sampling 3D noise over a grid of points
-- [ ] Add a debug view (e.g. draw a dot at each grid point below the threshold) to sanity-check the volume
+- [x] Generate a 3D scalar field by sampling 3D noise over a grid of points
+- [x] Add a debug view (e.g. draw a dot at each grid point below the threshold) to sanity-check the volume
 - [x] Find and copy the two marching cubes tables: the edge table and the triangle table (256 cases each)
-- [ ] For each cell, compare its 8 corners to the isovalue and pack the result into an 8-bit case index
-- [ ] Use the edge table to find crossed edges, place vertices at edge midpoints first, and emit triangles via the triangle table
-- [ ] Render the triangles unlit to confirm topology is correct before adding interpolation
-- [ ] Add linear interpolation along each crossed edge to position vertices precisely; confirm the surface smooths
-- [ ] Compute per-vertex normals from the gradient of the scalar field using finite differences (sample plus and minus along each axis, subtract, normalize)
+- [x] For each cell, compare its 8 corners to the isovalue and pack the result into an 8-bit case index
+- [x] Use the edge table to find crossed edges, place vertices at edge midpoints first, and emit triangles via the triangle table
+- [x] Render the triangles unlit to confirm topology is correct before adding interpolation
+- [x] Add linear interpolation along each crossed edge to position vertices precisely; confirm the surface smooths
+- [x] Compute per-vertex normals from the gradient of the scalar field using finite differences (sample plus and minus along each axis, subtract, normalize)
 - [ ] Add a debug mode that draws normals as short lines to verify they point outward
-- [ ] Build the final mesh (vertices, normals, indices) and render it lit
+- [x] Build the final mesh (vertices, normals, indices) and render it lit
 - [ ] Optional: weld shared vertices to reduce vertex count. Note this is for memory only; smooth normals already come from the field gradient
 
 ## Phase 3 - Make it terrain (still a single block)

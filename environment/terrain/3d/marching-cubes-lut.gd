@@ -1,10 +1,8 @@
 class_name MarchingCubesLUT
 
 # Marching Cubes lookup tables (canonical Paul Bourke / Lorensen-Cline convention)
-# EDGE_TABLE[case]  -> 12-bit mask of which of the 12 cube edges are intersected
-# TRI_TABLE[case]   -> edge indices, in groups of 3 (one triangle each), terminated by -1
-# 'case' is the 8-bit index built from which of the 8 corners are inside the surface.
 
+## EDGE_TABLE[case] -> 12-bit mask of which of the 12 cube edges are intersected
 const EDGE_TABLE := [
 	0x000, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
 	0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
@@ -40,6 +38,7 @@ const EDGE_TABLE := [
 	0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x000,
 ]
 
+## TRI_TABLE[case] -> edge indices, in groups of 3 (one triangle each), terminated by -1 'case' is the 8-bit index built from which of the 8 corners are inside the surface.
 const TRI_TABLE := [
 	[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
 	[0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
