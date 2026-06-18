@@ -11,5 +11,3 @@ script = ExtResource("1_pl6ge")
 
 [node name="Player" parent="." unique_id=766571082 instance=ExtResource("1_fylkb")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 6.8961353)
-
-[node name="GeneratedMesh" type="MeshInstance3D" parent="." unique_id=2104098724]

@@ -1,49 +1,50 @@
 extends Node3D
 
-@onready var generated_mesh := $GeneratedMesh
-
 ## How far apart each point is in real space
-@export var point_distance := 0.5
+@export var point_distance := 1
 ## The amount of points along the x, y, and z axis
-@export var size := 25
+@export var size := 50
+## noise volume to use for generating mesh data
+@export var scalar := FastNoiseLite.new()
 ## The value of the scalar field that represents the surface of the mesh
 @export var isosurface := .2
 ## True means the vertex positions will be interpolated, creating a much smoother surface. False means the steps will be much harder and blockier.
 @export var interpolated := true
+## Smooths out normals to remove the "blocky" lighting
+@export var shade_smooth := false
+## When true, display the scalar field as 3D point objects, colored to show which points are above/below the surface of the mesh
+@export var show_points := false
 ## Print out extra information to the console
 @export var verbose := true
-@export var show_points := false
-@export var shade_smooth := false
+
+# Arrays for storing generated mesh data
+var mesh_vertices: PackedVector3Array = []
+var mesh_normals: PackedVector3Array = []
 
 # MeshInstance3D scene for showing visble data points on the screen when you run the scene
 var point_scene: PackedScene = preload("res://environment/terrain/3d/point-3d.tscn")
 
 func _ready() -> void:
-	# ====== INITIALIZE DATA ======
-	
-	# Create a noise object to use as a scalar field
-	var scalar := FastNoiseLite.new()
-	scalar.noise_type = FastNoiseLite.TYPE_PERLIN
-	# Initialize an array to store vertices in for our mesh and another to store normals
-	var mesh_vertices: PackedVector3Array = []
-	var mesh_normals: PackedVector3Array = []
-	
-	
-	# ====== CREATE VISIBLE DATA POINTS ======
-	
-	if show_points:
-		if verbose: print("creating ", size * size * size, " points")
-		for x in size:
-			for y in size:
-				for z in size:
-					var scalar_value = scalar.get_noise_3d(x, y, z)
-					var point := point_scene.instantiate()
-					if scalar_value <= isosurface: point.above_iso = true # shows point as red
-					else: point.above_iso = false # shows point as green
-					add_child(point)
-					point.global_position = Vector3(x * point_distance, y * point_distance, z * point_distance)
-	
-	# ====== ITERATE THROUGH CUBES ======
+	if show_points: _display_visual_scalar_volume()
+	_generate_mesh_data()
+	_build_mesh()
+
+## Create a volume of Point3D nodes to display a visual of the scalar field. Green points are inside the surface and red points are outside the surface.
+func _display_visual_scalar_volume() -> void:
+	if verbose: print("creating ", size * size * size, " points")
+	for x in size:
+		for y in size:
+			for z in size:
+				var scalar_value = scalar.get_noise_3d(x, y, z)
+				var point := point_scene.instantiate()
+				if scalar_value <= isosurface: point.above_iso = true # shows point as red
+				else: point.above_iso = false # shows point as green
+				add_child(point)
+				point.global_position = Vector3(x * point_distance, y * point_distance, z * point_distance)
+
+## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assignes the generated data to mesh_vertices and mesh_data
+func _generate_mesh_data() -> void:
+	if verbose: print("marching cubes through ", size * size * size, " points...")
 	
 	#    c4---------e4-----------c5
 	# e6 / |                  e5 /|
@@ -60,9 +61,8 @@ func _ready() -> void:
 	
 	# 8-bit case index = c0*1 + c1*2 + c2*4 + c3*8 + c4*16 + c5*32 + c6*64 + c7*128
 	
-	if verbose: print("marching cubes through ", size * size * size, " points...")
-	
-	const EDGE_CORNERS := [ # the two corners each edge connects
+	# the two corners each edge connects
+	const EDGE_CORNERS := [ 
 					[0, 1], 
 					[1, 2], 
 					[2, 3], 
@@ -77,6 +77,7 @@ func _ready() -> void:
 					[3, 7]
 					] 
 	
+	# Loop through each cube and generate vertices and normals for that cube
 	for x in size - 1:
 		for y in size - 1:
 			for z in size - 1:
@@ -112,10 +113,9 @@ func _ready() -> void:
 				if c5 > isosurface: case_index |= (1 << 5)
 				if c6 > isosurface: case_index |= (1 << 6)
 				if c7 > isosurface: case_index |= (1 << 7)
-				
-				# determine where vertices go in real space
 				var segment = MarchingCubesLUT.TRI_TABLE[case_index]
 				
+				# determine where vertices go in real space and determine normals for each vertex
 				var i:= 0
 				while i < segment.size() and segment[i] != -1:
 					var edge_a = segment [i]
@@ -126,6 +126,7 @@ func _ready() -> void:
 					var vertex_c: Vector3
 					
 					if not interpolated:
+						# place vertices at the midway point along the cube edge
 						vertex_a = corner_pos[EDGE_CORNERS[edge_a][0]].lerp(corner_pos[EDGE_CORNERS[edge_a][1]], 0.5)
 						vertex_b = corner_pos[EDGE_CORNERS[edge_b][0]].lerp(corner_pos[EDGE_CORNERS[edge_b][1]], 0.5)
 						vertex_c = corner_pos[EDGE_CORNERS[edge_c][0]].lerp(corner_pos[EDGE_CORNERS[edge_c][1]], 0.5)
@@ -134,6 +135,7 @@ func _ready() -> void:
 						var t_a = (isosurface - corner_scalars[EDGE_CORNERS[edge_a][0]]) / (corner_scalars[EDGE_CORNERS[edge_a][1]] - corner_scalars[EDGE_CORNERS[edge_a][0]])
 						var t_b = (isosurface - corner_scalars[EDGE_CORNERS[edge_b][0]]) / (corner_scalars[EDGE_CORNERS[edge_b][1]] - corner_scalars[EDGE_CORNERS[edge_b][0]])
 						var t_c = (isosurface - corner_scalars[EDGE_CORNERS[edge_c][0]]) / (corner_scalars[EDGE_CORNERS[edge_c][1]] - corner_scalars[EDGE_CORNERS[edge_c][0]])
+						# apply interpolation ratio when determining vertex position
 						vertex_a = corner_pos[EDGE_CORNERS[edge_a][0]].lerp(corner_pos[EDGE_CORNERS[edge_a][1]], t_a)
 						vertex_b = corner_pos[EDGE_CORNERS[edge_b][0]].lerp(corner_pos[EDGE_CORNERS[edge_b][1]], t_b)
 						vertex_c = corner_pos[EDGE_CORNERS[edge_c][0]].lerp(corner_pos[EDGE_CORNERS[edge_c][1]], t_c)
@@ -163,13 +165,10 @@ func _ready() -> void:
 					mesh_vertices.append(vertex_c)
 					
 					i += 3
-	
-	# ====== BUILD MESH ======
-	
+
+## Creates an ArrayMesh and assigned generated data to it. Then, creates a MeshInstance3D, assigns the ArrayMesh to it, and adds it to the scene
+func _build_mesh() -> void:	
 	if verbose: print("building mesh from ", mesh_vertices.size(), " vertices...")
-	
-	# initialize mesh array
-	var array_mesh := ArrayMesh.new()
 	
 	# package data needed to create the mesh
 	var mesh_indices: PackedInt32Array = []
@@ -181,6 +180,11 @@ func _ready() -> void:
 	surface_arrays[Mesh.ARRAY_INDEX] = mesh_indices
 	surface_arrays[Mesh.ARRAY_NORMAL] = mesh_normals
 	
-	# assign the data to the mesh and mesh instance
+	# create the mesh and assign data to it
+	var array_mesh := ArrayMesh.new()
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
-	generated_mesh.mesh = array_mesh
+	
+	# create the mesh instance, assign the mesh to it, and add it to the scene
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.mesh = array_mesh
+	self.add_child(mesh_instance)
