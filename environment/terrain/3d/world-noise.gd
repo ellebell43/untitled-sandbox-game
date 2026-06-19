@@ -3,8 +3,11 @@ extends  Node
 
 var _noise := FastNoiseLite.new()
 var _amplitude := 1
+## where the general floor is located, relative to the center of the world
 var _floor: float
+## center of the 3D volume
 var center: Vector3
+## How strong fall the bias is towards being inside or outside of the volume relative to _floor
 var floor_bias := .2
 
 func _init(_seed: int, size: float):
@@ -16,7 +19,8 @@ func _init(_seed: int, size: float):
 	_noise.seed = _seed
 	center = Vector3(size/2,size/2, size/2)
 	_floor = size/2.5
-	
+
+## Get a noise sample biased towards a world shape at a specific Vec3 of the noise volume
 func sample(x: float, y: float, z: float) -> float:
 	var _sample := _noise.get_noise_3d(x, y, z)
 	var pos := Vector3(x, y, z)

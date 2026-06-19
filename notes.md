@@ -40,9 +40,9 @@ A few principles baked into the ordering:
 
 ## Phase 3 - Make it terrain (still a single block)
 
-- [ ] Replace random noise with a terrain-shaped density function (e.g. a heightmap-style term for the ground surface combined with 3D noise for caves and overhangs); tune until it reads as terrain
-- [ ] Make the noise seed-based and deterministic so the same world coordinates always produce the same field (required for consistent streaming later)
-- [ ] Expose tuning parameters (frequency, amplitude, octaves, surface height) so you can iterate on terrain feel
+- [x] Replace random noise with a terrain-shaped density function (e.g. a heightmap-style term for the ground surface combined with 3D noise for caves and overhangs); tune until it reads as terrain
+- [x] Make the noise seed-based and deterministic so the same world coordinates always produce the same field (required for consistent streaming later)
+- [x] Expose tuning parameters (frequency, amplitude, octaves, surface height) so you can iterate on terrain feel
 
 ## Phase 4 - Chunking on the CPU (single resolution)
 
