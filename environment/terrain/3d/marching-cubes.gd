@@ -4,10 +4,8 @@ extends Node3D
 @export var point_distance := 1
 ## The amount of points along the x, y, and z axis
 @export var size := 50
-## noise volume to use for generating mesh data
-@export var scalar := FastNoiseLite.new()
-## The value of the scalar field that represents the surface of the mesh
-@export var isosurface := .2
+## Seed of the terrain generation
+@export var world_seed := 1
 ## True means the vertex positions will be interpolated, creating a much smoother surface. False means the steps will be much harder and blockier.
 @export var interpolated := true
 ## Smooths out normals to remove the "blocky" lighting
@@ -17,6 +15,11 @@ extends Node3D
 ## Print out extra information to the console
 @export var verbose := true
 
+## noise volume to use for generating mesh data
+var scalar: WorldNoise
+## The value of the scalar field that represents the surface of the mesh
+var isosurface := 0.0
+
 # Arrays for storing generated mesh data
 var mesh_vertices: PackedVector3Array = []
 var mesh_normals: PackedVector3Array = []
@@ -25,6 +28,7 @@ var mesh_normals: PackedVector3Array = []
 var point_scene: PackedScene = preload("res://environment/terrain/3d/point-3d.tscn")
 
 func _ready() -> void:
+	scalar = WorldNoise.new(world_seed, size)
 	if show_points: _display_visual_scalar_volume()
 	_generate_mesh_data()
 	_build_mesh()
@@ -35,9 +39,9 @@ func _display_visual_scalar_volume() -> void:
 	for x in size:
 		for y in size:
 			for z in size:
-				var scalar_value = scalar.get_noise_3d(x, y, z)
+				var scalar_value = scalar.sample(x, y, z)
 				var point := point_scene.instantiate()
-				if scalar_value <= isosurface: point.above_iso = true # shows point as red
+				if scalar_value >= isosurface: point.above_iso = true # shows point as red
 				else: point.above_iso = false # shows point as green
 				add_child(point)
 				point.global_position = Vector3(x * point_distance, y * point_distance, z * point_distance)
@@ -93,26 +97,26 @@ func _generate_mesh_data() -> void:
 				var corner_pos = [c0_pos, c1_pos, c2_pos, c3_pos, c4_pos, c5_pos, c6_pos, c7_pos]
 				
 				# cube corner scalar values
-				var c0 = scalar.get_noise_3d(x, y, z)
-				var c1 = scalar.get_noise_3d(x + 1, y, z)
-				var c2 = scalar.get_noise_3d(x + 1, y, z + 1)
-				var c3 = scalar.get_noise_3d(x, y, z + 1)
-				var c4 = scalar.get_noise_3d(x, y + 1, z)
-				var c5 = scalar.get_noise_3d(x + 1, y + 1, z)
-				var c6 = scalar.get_noise_3d(x + 1, y + 1, z + 1)
-				var c7 = scalar.get_noise_3d(x, y + 1, z + 1)
+				var c0 = scalar.sample(x, y, z)
+				var c1 = scalar.sample(x + 1, y, z)
+				var c2 = scalar.sample(x + 1, y, z + 1)
+				var c3 = scalar.sample(x, y, z + 1)
+				var c4 = scalar.sample(x, y + 1, z)
+				var c5 = scalar.sample(x + 1, y + 1, z)
+				var c6 = scalar.sample(x + 1, y + 1, z + 1)
+				var c7 = scalar.sample(x, y + 1, z + 1)
 				var corner_scalars = [c0, c1, c2, c3, c4, c5, c6, c7]
 				
 				# determine case index
 				var case_index = 0
-				if c0 > isosurface: case_index |= (1 << 0)
-				if c1 > isosurface: case_index |= (1 << 1)
-				if c2 > isosurface: case_index |= (1 << 2)
-				if c3 > isosurface: case_index |= (1 << 3)
-				if c4 > isosurface: case_index |= (1 << 4)
-				if c5 > isosurface: case_index |= (1 << 5)
-				if c6 > isosurface: case_index |= (1 << 6)
-				if c7 > isosurface: case_index |= (1 << 7)
+				if c0 < isosurface: case_index |= (1 << 0)
+				if c1 < isosurface: case_index |= (1 << 1)
+				if c2 < isosurface: case_index |= (1 << 2)
+				if c3 < isosurface: case_index |= (1 << 3)
+				if c4 < isosurface: case_index |= (1 << 4)
+				if c5 < isosurface: case_index |= (1 << 5)
+				if c6 < isosurface: case_index |= (1 << 6)
+				if c7 < isosurface: case_index |= (1 << 7)
 				var segment = MarchingCubesLUT.TRI_TABLE[case_index]
 				
 				# determine where vertices go in real space and determine normals for each vertex
@@ -145,24 +149,24 @@ func _generate_mesh_data() -> void:
 						var sample_step = 0.1
 						for v in verts:
 							var noise_position = v / point_distance
-							var sample_x_1 := scalar.get_noise_3d(noise_position.x + sample_step, noise_position.y, noise_position.z)
-							var sample_x_2 := scalar.get_noise_3d(noise_position.x - sample_step, noise_position.y, noise_position.z)
-							var sample_y_1 := scalar.get_noise_3d(noise_position.x, noise_position.y + sample_step, noise_position.z)
-							var sample_y_2 := scalar.get_noise_3d(noise_position.x, noise_position.y - sample_step, noise_position.z)
-							var sample_z_1 := scalar.get_noise_3d(noise_position.x, noise_position.y, noise_position.z + sample_step)
-							var sample_z_2 := scalar.get_noise_3d(noise_position.x, noise_position.y, noise_position.z - sample_step)
+							var sample_x_1 := scalar.sample(noise_position.x + sample_step, noise_position.y, noise_position.z)
+							var sample_x_2 := scalar.sample(noise_position.x - sample_step, noise_position.y, noise_position.z)
+							var sample_y_1 := scalar.sample(noise_position.x, noise_position.y + sample_step, noise_position.z)
+							var sample_y_2 := scalar.sample(noise_position.x, noise_position.y - sample_step, noise_position.z)
+							var sample_z_1 := scalar.sample(noise_position.x, noise_position.y, noise_position.z + sample_step)
+							var sample_z_2 := scalar.sample(noise_position.x, noise_position.y, noise_position.z - sample_step)
 							var gradient = Vector3(sample_x_1 - sample_x_2, sample_y_1 - sample_y_2, sample_z_1 - sample_z_2)
-							var normal = gradient.normalized()
+							var normal = -gradient.normalized()
 							mesh_normals.append(normal)
 					else:
-						var normal = -(vertex_b - vertex_a).cross(vertex_c - vertex_a)
+						var normal = (vertex_b - vertex_a).cross(vertex_c - vertex_a)
 						mesh_normals.append(normal)
 						mesh_normals.append(normal)
 						mesh_normals.append(normal)
 					
 					mesh_vertices.append(vertex_a)
-					mesh_vertices.append(vertex_b)
 					mesh_vertices.append(vertex_c)
+					mesh_vertices.append(vertex_b)
 					
 					i += 3
 
