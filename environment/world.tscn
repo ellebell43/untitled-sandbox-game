@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://dmj3gcid0qbdm"]
+
+[ext_resource type="PackedScene" uid="uid://dhucnlt37jkjb" path="res://environment/default-environment.tscn" id="1_wpdqg"]
+[ext_resource type="PackedScene" uid="uid://bauo30v5lrxcu" path="res://actors/player.tscn" id="2_sf4n2"]
+[ext_resource type="PackedScene" uid="uid://cf2ntfaxs530y" path="res://environment/terrain/3d/marching-cubes.tscn" id="3_wpdqf"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_wpdqf"]
+domain_warp_enabled = true
+
+[node name="World" type="Node3D" unique_id=1029309]
+
+[node name="Environment" parent="." unique_id=1058607106 instance=ExtResource("1_wpdqg")]
+
+[node name="Player" parent="." unique_id=766571082 instance=ExtResource("2_sf4n2")]
+
+[node name="marching-cubes" parent="." unique_id=1345121214 instance=ExtResource("3_wpdqf")]
+size = 100
+scalar = SubResource("FastNoiseLite_wpdqf")
+isosurface = 0.05
