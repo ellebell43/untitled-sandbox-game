@@ -6,8 +6,8 @@
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_iyx0m"]
 
-[node name="Player" type="CharacterBody3D" unique_id=766571082]
-collision_layer = 2
+[node name="Player" type="CharacterBody3D" unique_id=789025970]
+collision_mask = 2
 script = ExtResource("1_15tap")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1508391763]
@@ -17,4 +17,5 @@ mesh = SubResource("CapsuleMesh_bl13t")
 shape = SubResource("CapsuleShape3D_iyx0m")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=990450438]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.52482224, -0.46089685)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.525, 0)
+current = true

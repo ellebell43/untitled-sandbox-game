@@ -31,13 +31,13 @@ func _process(_delta: float) -> void:
 			for z in chunk_count:
 				var current_chunk_pos = Vector3(x, y, z)
 				# If current_chunk_pos is within the render distance of the player_chunk_pos, and it's not in the loaded dictionary, load the chunk
-				if abs(player_chunk_pos.distance_to(current_chunk_pos)) < render_distance and not loaded_chunks.get(current_chunk_pos):
+				if abs((player_chunk_pos).distance_to(current_chunk_pos)) < render_distance and not loaded_chunks.get(current_chunk_pos):
 					load_chunk(current_chunk_pos)
-				if abs(player_chunk_pos.distance_to(current_chunk_pos)) > render_distance and loaded_chunks.get(current_chunk_pos):
+				if abs((player_chunk_pos).distance_to(current_chunk_pos)) > render_distance and loaded_chunks.get(current_chunk_pos):
 					unload_chunk(current_chunk_pos)
 
 func get_player_chunk_pos() -> Vector3:
-	return (player.global_position / chunk_size)
+	return (to_local(player.global_position) / chunk_size)
 
 func load_chunk(chunk_pos: Vector3) -> void:
 	if verbose: print("Loading chunk at chunk position ", chunk_pos)

@@ -1,5 +1,5 @@
 class_name Chunk
-extends MeshInstance3D
+extends Node3D
 
 ## The amount of points along the x, y, and z axis
 @export var size := 50
@@ -216,8 +216,10 @@ func _build_mesh() -> void:
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
 	
 	# create the mesh instance, assign the mesh to it, and add it to the scene
-	self.mesh = array_mesh
-	
-	# place mesh directly around the node origin
-	#@warning_ignore("integer_division")
-	#mesh_instance.position = Vector3(-size/2, -size/2, -size/2)
+	var mesh_instace = MeshInstance3D.new()
+	mesh_instace.mesh = array_mesh
+	self.add_child(mesh_instace)
+	mesh_instace.create_trimesh_collision()
+	var collision_instance: StaticBody3D = mesh_instace.get_child(0)
+	collision_instance.set_collision_layer_value(2, true) # planet collision layer
+	collision_instance.set_collision_mask_value(1, true) # player collisions
