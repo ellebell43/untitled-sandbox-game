@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://p50l0yu47556"]
 
-[ext_resource type="Script" uid="uid://cmskads32bpav" path="res://environment/planet.gd" id="1_ihk74"]
+[ext_resource type="Script" uid="uid://cmskads32bpav" path="res://environment/world-generation/planet.gd" id="1_ihk74"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_74117"]
 

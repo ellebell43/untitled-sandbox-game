@@ -9,9 +9,6 @@ const ROTATION_SPEED = 3
 const LOOK_SENSITIVITY = 0.005
 var friction = 14.0
 
-#var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
-#var gravity = 0
-
 @onready var camera = $Camera3D
 
 func _ready() -> void:

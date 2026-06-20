@@ -19,6 +19,10 @@ run/main_scene="uid://dmj3gcid0qbdm"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
+[filesystem]
+
+import/blender/enabled=false
+
 [input]
 
 move_right={
