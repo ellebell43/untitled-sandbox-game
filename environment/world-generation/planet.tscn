@@ -13,7 +13,9 @@ gravity_space_override = 3
 gravity_point = true
 gravity_point_center = Vector3(0, 0, 0)
 gravity_direction = Vector3(0, 0, 0)
-gravity = 32.0
 
 [node name="GravityShape" type="CollisionShape3D" parent="GravityArea" unique_id=1006933701]
 shape = SubResource("SphereShape3D_74117")
+
+[connection signal="body_entered" from="GravityArea" to="." method="_on_gravity_area_body_entered"]
+[connection signal="body_exited" from="GravityArea" to="." method="_on_gravity_area_body_exited"]
