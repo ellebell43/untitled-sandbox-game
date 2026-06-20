@@ -27,7 +27,7 @@ var scalar_samples: Array = []
 var should_skip: bool = false
 
 # MeshInstance3D scene for showing visble data points on the screen when you run the scene
-var point_scene: PackedScene = preload("res://environment/terrain/3d/point-3d.tscn")
+var point_scene: PackedScene = preload("res://environment/world-generation/point-3d.tscn")
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3):
 	self.size = _size
