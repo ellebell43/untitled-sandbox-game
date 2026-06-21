@@ -8,8 +8,9 @@
 
 [node name="Environment" parent="." unique_id=1058607106 instance=ExtResource("1_7xck8")]
 
-[node name="Player" parent="." unique_id=766571082 node_paths=PackedStringArray("spawn_world") instance=ExtResource("2_br15j")]
-spawn_world = NodePath("../Planet")
-
 [node name="Planet" parent="." unique_id=1766259659 node_paths=PackedStringArray("player") instance=ExtResource("3_wam8f")]
 player = NodePath("../Player")
+chunk_count = 30
+
+[node name="Player" parent="." unique_id=766571082 node_paths=PackedStringArray("spawn_world") instance=ExtResource("2_br15j")]
+spawn_world = NodePath("../Planet")
