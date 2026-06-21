@@ -14,6 +14,8 @@ var isosurface := 0.0
 ## Chunk space offset to apply to vertex positions
 var offset := Vector3(0, 0, 0)
 
+var mesh_data : ArrayMesh
+
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3):
 	self.size = _size
 	self.scalar = _noise
@@ -162,16 +164,16 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 	return array_mesh
 
 ## Returns ArrayMesh data for building a MeshInstance3D for this chunk. Returns null if no MeshInstance should be created
-func get_mesh_data() -> ArrayMesh:
+func genrate_mesh_data() -> void:
 	var scalar_samples = _construct_sample_set()
-	if scalar_samples.size() == 0: return null # skip cubes that are either all inside the mesh volume or outide the mesh volume
-	return _generate_mesh_data(scalar_samples)
+	if scalar_samples.size() == 0: mesh_data = null; return
+	mesh_data = _generate_mesh_data(scalar_samples)
 
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it.
-func build_mesh(array_mesh: ArrayMesh) -> void:
+func build_mesh() -> void:
 	# create the mesh instance, assign the mesh to it, and add it to the scene
 	var mesh_instace = MeshInstance3D.new()
-	mesh_instace.mesh = array_mesh
+	mesh_instace.mesh = mesh_data
 	self.add_child(mesh_instace)
 	mesh_instace.create_trimesh_collision()
 	var collision_instance: StaticBody3D = mesh_instace.get_child(0)

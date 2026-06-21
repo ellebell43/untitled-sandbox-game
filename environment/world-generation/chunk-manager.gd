@@ -48,6 +48,11 @@ func load_chunk(chunk_pos: Vector3) -> void:
 	if verbose: print("Player global pos: ", player.global_position)
 	loaded_chunks.set(chunk_pos, new_chunk)
 	
+	# use threads to populate chunk node with mesh
+	var task_id = WorkerThreadPool.add_task(new_chunk.genrate_mesh_data)
+	WorkerThreadPool.wait_for_task_completion(task_id)
+	if new_chunk != null and new_chunk.mesh_data != null:
+		new_chunk.build_mesh()
 
 func unload_chunk(chunk_pos: Vector3) -> void:
 	if verbose: print("Unloading chunk at chunk position ", chunk_pos)
