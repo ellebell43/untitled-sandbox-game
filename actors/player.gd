@@ -16,7 +16,10 @@ var current_world: Planet = null
 
 func _ready() -> void:
 	if spawn_world:
-		global_position = Vector3(spawn_world.world_radius, spawn_world.world_radius, spawn_world.world_radius)
+		global_position = spawn_world.get_valid_spawn_point()
+		var target_basis := get_planet_aligned_basis()
+		global_transform.basis = target_basis
+		#global_position = Vector3(spawn_world.world_radius, spawn_world.world_radius, spawn_world.world_radius)
 
 func _physics_process(delta):
 	# orient player with planets surface
@@ -42,6 +45,7 @@ func _physics_process(delta):
 		var z_v := target_basis.z * direction.x
 		var v_sum = z_v + x_v
 		velocity = (v_sum * SPEED) + planet_rotation_v
+		if Input.is_action_pressed("sprint"): velocity *= 2
 	else: 
 		velocity = planet_rotation_v
 	
