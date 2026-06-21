@@ -10,7 +10,7 @@ extends Node3D
 ## number of chunks to render out
 @export var render_distance := 4
 @export var rotation_speed := .04
-@export var rotation_axis := Vector3(0, 0.5, 1).normalized()
+@export var rotation_axis := Vector3(randf(), randf(), randf()).normalized()
 
 @onready var gravity_shape := $GravityArea/GravityShape
 
