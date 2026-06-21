@@ -1,57 +1,44 @@
 class_name Chunk
 extends Node3D
 
-## The amount of points along the x, y, and z axis
-var size := 50
-## Seed of the terrain generation
-var world_seed := 1
-## True means the vertex positions will be interpolated, creating a much smoother surface. False means the steps will be much harder and blockier.
-var interpolated := true
-## Smooths out normals to remove the "blocky" lighting
-#var shade_smooth := false
+# ============ BASIC CHUNK CHARACTERISTICS ============
 
+## The amount of points along the x, y, and z axis
+var size : int
+## Seed of the terrain generation
+var world_seed : int
 ## noise volume to use for generating mesh data
 var scalar: WorldNoise = null
 ## The value of the scalar field that represents the surface of the mesh
 var isosurface := 0.0
+## Chunk space offset to apply to vertex positions
 var offset := Vector3(0, 0, 0)
-
-# Arrays for storing generated mesh data
-var mesh_vertices: PackedVector3Array = []
-var mesh_normals: PackedVector3Array = []
-var scalar_samples: Array = []
-var should_skip: bool = false
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3):
 	self.size = _size
 	self.scalar = _noise
 	self.offset = _offset
 
-func _ready() -> void:
-	if not scalar: scalar = WorldNoise.new(world_seed, size)
-	_construct_sample_set()
-	if should_skip: return # determined in _construct_sample_set()
-	_generate_mesh_data()
-	# if any mesh data is generated, build a mesh. otherwise, skip.
-	if mesh_vertices.size() > 0: _build_mesh()
-
-## Fill an array with one copy of all needed scalar values to avoid sampling the same point multiple times. Also check if all points are above/below the iso. If so, should_skip = true
-func _construct_sample_set():
-	var is_all_above = true
-	var is_all_below = true
+## Returns either an array of scalar values to use in generating mesh data. The array has one copy of all needed scalar values to avoid sampling the same point multiple times. Null is returned when all points are above or below the surface, so no mesh should be generated
+func _construct_sample_set() -> PackedFloat32Array:
+	var scalar_samples: PackedFloat32Array = []
+	var is_all_above := true
+	var is_all_below := true
 	for x in size +  1:
 		for y in size +  1:
 			for z in size +  1:
-				var sample = scalar.sample(x + offset.x, y + offset.y, z + offset.z)
+				var sample := scalar.sample(x + offset.x, y + offset.y, z + offset.z)
 				scalar_samples.append(sample)
 				if sample > isosurface: is_all_below = false
 				if sample < isosurface: is_all_above = false
 	
 	if is_all_above or is_all_below: 
-		should_skip = true
+		return []
+	else:
+		return scalar_samples
 
 ## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assignes the generated data to mesh_vertices and mesh_data
-func _generate_mesh_data() -> void:
+func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 	
 	#    c4---------e4-------------c5
 	# e6 / |                    e5 /|
@@ -70,19 +57,22 @@ func _generate_mesh_data() -> void:
 	
 	# the two corners each edge connects
 	const EDGE_CORNERS := [ 
-					[0, 1], 
-					[1, 2], 
-					[2, 3], 
-					[3, 0],
-					[4, 5], 
-					[5, 6], 
-					[6, 7], 
-					[7, 4],
-					[0, 4],
-					[1, 5],
-					[2, 6],
-					[3, 7]
-					] 
+		[0, 1], 
+		[1, 2], 
+		[2, 3], 
+		[3, 0],
+		[4, 5], 
+		[5, 6], 
+		[6, 7], 
+		[7, 4],
+		[0, 4],
+		[1, 5],
+		[2, 6],
+		[3, 7]
+	] 
+	# Arrays for storing generated mesh data
+	var mesh_vertices: PackedVector3Array = []
+	var mesh_normals: PackedVector3Array = []
 	
 	# Loop through each cube and generate vertices and normals for that cube
 	for x in size:# - 1:
@@ -134,48 +124,28 @@ func _generate_mesh_data() -> void:
 					var vertex_b: Vector3
 					var vertex_c: Vector3
 					
-					if not interpolated:
-						# place vertices at the midway point along the cube edge
-						vertex_a = corner_pos[EDGE_CORNERS[edge_a][0]].lerp(corner_pos[EDGE_CORNERS[edge_a][1]], 0.5)
-						vertex_b = corner_pos[EDGE_CORNERS[edge_b][0]].lerp(corner_pos[EDGE_CORNERS[edge_b][1]], 0.5)
-						vertex_c = corner_pos[EDGE_CORNERS[edge_c][0]].lerp(corner_pos[EDGE_CORNERS[edge_c][1]], 0.5)
-					else:
-						# determine interpolation ratio
-						var t_a = (isosurface - corner_scalars[EDGE_CORNERS[edge_a][0]]) / (corner_scalars[EDGE_CORNERS[edge_a][1]] - corner_scalars[EDGE_CORNERS[edge_a][0]])
-						var t_b = (isosurface - corner_scalars[EDGE_CORNERS[edge_b][0]]) / (corner_scalars[EDGE_CORNERS[edge_b][1]] - corner_scalars[EDGE_CORNERS[edge_b][0]])
-						var t_c = (isosurface - corner_scalars[EDGE_CORNERS[edge_c][0]]) / (corner_scalars[EDGE_CORNERS[edge_c][1]] - corner_scalars[EDGE_CORNERS[edge_c][0]])
-						# apply interpolation ratio when determining vertex position
-						vertex_a = corner_pos[EDGE_CORNERS[edge_a][0]].lerp(corner_pos[EDGE_CORNERS[edge_a][1]], t_a)
-						vertex_b = corner_pos[EDGE_CORNERS[edge_b][0]].lerp(corner_pos[EDGE_CORNERS[edge_b][1]], t_b)
-						vertex_c = corner_pos[EDGE_CORNERS[edge_c][0]].lerp(corner_pos[EDGE_CORNERS[edge_c][1]], t_c)
+					# determine interpolation ratio
+					var t_a = (isosurface - corner_scalars[EDGE_CORNERS[edge_a][0]]) / (corner_scalars[EDGE_CORNERS[edge_a][1]] - corner_scalars[EDGE_CORNERS[edge_a][0]])
+					var t_b = (isosurface - corner_scalars[EDGE_CORNERS[edge_b][0]]) / (corner_scalars[EDGE_CORNERS[edge_b][1]] - corner_scalars[EDGE_CORNERS[edge_b][0]])
+					var t_c = (isosurface - corner_scalars[EDGE_CORNERS[edge_c][0]]) / (corner_scalars[EDGE_CORNERS[edge_c][1]] - corner_scalars[EDGE_CORNERS[edge_c][0]])
+					# apply interpolation ratio when determining vertex position
+					vertex_a = corner_pos[EDGE_CORNERS[edge_a][0]].lerp(corner_pos[EDGE_CORNERS[edge_a][1]], t_a)
+					vertex_b = corner_pos[EDGE_CORNERS[edge_b][0]].lerp(corner_pos[EDGE_CORNERS[edge_b][1]], t_b)
+					vertex_c = corner_pos[EDGE_CORNERS[edge_c][0]].lerp(corner_pos[EDGE_CORNERS[edge_c][1]], t_c)
 					
-					#var verts = [vertex_a, vertex_c, vertex_b]
-					#if shade_smooth:
-						#var sample_step = 0.1
-						#for v in verts:
-							#var sample_x_1 := scalar.sample(v.x + sample_step, v.y, v.z)
-							#var sample_x_2 := scalar.sample(v.x - sample_step, v.y, v.z)
-							#var sample_y_1 := scalar.sample(v.x, v.y + sample_step, v.z)
-							#var sample_y_2 := scalar.sample(v.x, v.y - sample_step, v.z)
-							#var sample_z_1 := scalar.sample(v.x, v.y, v.z + sample_step)
-							#var sample_z_2 := scalar.sample(v.x, v.y, v.z - sample_step)
-							#var gradient = Vector3(sample_x_1 - sample_x_2, sample_y_1 - sample_y_2, sample_z_1 - sample_z_2)
-							#var normal = -gradient.normalized()
-							#mesh_normals.append(normal)
-					#else:
+					# append vertices to vertices array
+					mesh_vertices.append(vertex_a)
+					mesh_vertices.append(vertex_c)
+					mesh_vertices.append(vertex_b)
+					
+					# determine normal and append to normals array
 					var normal = (vertex_b - vertex_a).cross(vertex_c - vertex_a)
 					mesh_normals.append(normal)
 					mesh_normals.append(normal)
 					mesh_normals.append(normal)
 					
-					mesh_vertices.append(vertex_a)
-					mesh_vertices.append(vertex_c)
-					mesh_vertices.append(vertex_b)
-					
 					i += 3
-
-## Creates an ArrayMesh and assigned generated data to it. Then, creates a MeshInstance3D, assigns the ArrayMesh to it, and adds it to the scene
-func _build_mesh() -> void:	
+	
 	# package data needed to create the mesh
 	var mesh_indices: PackedInt32Array = []
 	for i in range(mesh_vertices.size()):
@@ -189,7 +159,16 @@ func _build_mesh() -> void:
 	# create the mesh and assign data to it
 	var array_mesh := ArrayMesh.new()
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
-	
+	return array_mesh
+
+## Returns ArrayMesh data for building a MeshInstance3D for this chunk. Returns null if no MeshInstance should be created
+func get_mesh_data() -> ArrayMesh:
+	var scalar_samples = _construct_sample_set()
+	if scalar_samples.size() == 0: return null # skip cubes that are either all inside the mesh volume or outide the mesh volume
+	return _generate_mesh_data(scalar_samples)
+
+## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it.
+func build_mesh(array_mesh: ArrayMesh) -> void:
 	# create the mesh instance, assign the mesh to it, and add it to the scene
 	var mesh_instace = MeshInstance3D.new()
 	mesh_instace.mesh = array_mesh
