@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://dmj3gcid0qbdm"]
+
+[ext_resource type="PackedScene" uid="uid://dhucnlt37jkjb" path="res://environment/default-environment.tscn" id="1_7xck8"]
+[ext_resource type="PackedScene" uid="uid://bauo30v5lrxcu" path="res://actors/player.tscn" id="2_br15j"]
+[ext_resource type="PackedScene" uid="uid://p50l0yu47556" path="res://environment/world-generation/planet.tscn" id="3_wam8f"]
+
+[node name="System" type="Node3D" unique_id=1029309]
+
+[node name="Environment" parent="." unique_id=1058607106 instance=ExtResource("1_7xck8")]
+
+[node name="Player" parent="." unique_id=766571082 node_paths=PackedStringArray("spawn_world") instance=ExtResource("2_br15j")]
+spawn_world = NodePath("../Planet")
+
+[node name="Planet" parent="." unique_id=1766259659 node_paths=PackedStringArray("player") instance=ExtResource("3_wam8f")]
+player = NodePath("../Player")

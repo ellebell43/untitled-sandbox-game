@@ -18,3 +18,6 @@ mono_crash.*.json
 
 #vscode settings
 .vscode/
+
+# MacOS directory data files
+.DS_Store
