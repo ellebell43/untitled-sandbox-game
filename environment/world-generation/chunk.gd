@@ -2,17 +2,13 @@ class_name Chunk
 extends Node3D
 
 ## The amount of points along the x, y, and z axis
-@export var size := 50
+var size := 50
 ## Seed of the terrain generation
-@export var world_seed := 1
+var world_seed := 1
 ## True means the vertex positions will be interpolated, creating a much smoother surface. False means the steps will be much harder and blockier.
-@export var interpolated := true
+var interpolated := true
 ## Smooths out normals to remove the "blocky" lighting
-@export var shade_smooth := false
-## When true, display the scalar field as 3D point objects, colored to show which points are above/below the surface of the mesh
-@export var show_points := false
-## Print out extra information to the console
-@export var verbose := false
+#var shade_smooth := false
 
 ## noise volume to use for generating mesh data
 var scalar: WorldNoise = null
@@ -26,9 +22,6 @@ var mesh_normals: PackedVector3Array = []
 var scalar_samples: Array = []
 var should_skip: bool = false
 
-# MeshInstance3D scene for showing visble data points on the screen when you run the scene
-var point_scene: PackedScene = preload("res://environment/world-generation/point-3d.tscn")
-
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3):
 	self.size = _size
 	self.scalar = _noise
@@ -36,25 +29,11 @@ func _init(_size: int, _noise: WorldNoise, _offset: Vector3):
 
 func _ready() -> void:
 	if not scalar: scalar = WorldNoise.new(world_seed, size)
-	if show_points: _display_visual_scalar_volume()
 	_construct_sample_set()
 	if should_skip: return # determined in _construct_sample_set()
 	_generate_mesh_data()
 	# if any mesh data is generated, build a mesh. otherwise, skip.
 	if mesh_vertices.size() > 0: _build_mesh()
-
-## Create a volume of Point3D nodes to display a visual of the scalar field. Green points are inside the surface and red points are outside the surface.
-func _display_visual_scalar_volume() -> void:
-	if verbose: print("creating ", size * size * size, " points")
-	for x in size:
-		for y in size:
-			for z in size:
-				var scalar_value = scalar.sample(x, y, z)
-				var point := point_scene.instantiate()
-				if scalar_value >= isosurface: point.above_iso = true # shows point as red
-				else: point.above_iso = false # shows point as green
-				add_child(point)
-				point.position = Vector3(x, y, z)
 
 ## Fill an array with one copy of all needed scalar values to avoid sampling the same point multiple times. Also check if all points are above/below the iso. If so, should_skip = true
 func _construct_sample_set():
@@ -70,11 +49,9 @@ func _construct_sample_set():
 	
 	if is_all_above or is_all_below: 
 		should_skip = true
-		if verbose: print("skipping chunk.\nAll above: ", is_all_above, "\nAll below: ", is_all_below)
 
 ## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assignes the generated data to mesh_vertices and mesh_data
 func _generate_mesh_data() -> void:
-	if verbose: print("marching cubes through ", size * size * size, " points...")
 	
 	#    c4---------e4-------------c5
 	# e6 / |                    e5 /|
@@ -172,24 +149,24 @@ func _generate_mesh_data() -> void:
 						vertex_b = corner_pos[EDGE_CORNERS[edge_b][0]].lerp(corner_pos[EDGE_CORNERS[edge_b][1]], t_b)
 						vertex_c = corner_pos[EDGE_CORNERS[edge_c][0]].lerp(corner_pos[EDGE_CORNERS[edge_c][1]], t_c)
 					
-					var verts = [vertex_a, vertex_c, vertex_b]
-					if shade_smooth:
-						var sample_step = 0.1
-						for v in verts:
-							var sample_x_1 := scalar.sample(v.x + sample_step, v.y, v.z)
-							var sample_x_2 := scalar.sample(v.x - sample_step, v.y, v.z)
-							var sample_y_1 := scalar.sample(v.x, v.y + sample_step, v.z)
-							var sample_y_2 := scalar.sample(v.x, v.y - sample_step, v.z)
-							var sample_z_1 := scalar.sample(v.x, v.y, v.z + sample_step)
-							var sample_z_2 := scalar.sample(v.x, v.y, v.z - sample_step)
-							var gradient = Vector3(sample_x_1 - sample_x_2, sample_y_1 - sample_y_2, sample_z_1 - sample_z_2)
-							var normal = gradient.normalized()
-							mesh_normals.append(normal)
-					else:
-						var normal = (vertex_b - vertex_a).cross(vertex_c - vertex_a)
-						mesh_normals.append(normal)
-						mesh_normals.append(normal)
-						mesh_normals.append(normal)
+					#var verts = [vertex_a, vertex_c, vertex_b]
+					#if shade_smooth:
+						#var sample_step = 0.1
+						#for v in verts:
+							#var sample_x_1 := scalar.sample(v.x + sample_step, v.y, v.z)
+							#var sample_x_2 := scalar.sample(v.x - sample_step, v.y, v.z)
+							#var sample_y_1 := scalar.sample(v.x, v.y + sample_step, v.z)
+							#var sample_y_2 := scalar.sample(v.x, v.y - sample_step, v.z)
+							#var sample_z_1 := scalar.sample(v.x, v.y, v.z + sample_step)
+							#var sample_z_2 := scalar.sample(v.x, v.y, v.z - sample_step)
+							#var gradient = Vector3(sample_x_1 - sample_x_2, sample_y_1 - sample_y_2, sample_z_1 - sample_z_2)
+							#var normal = -gradient.normalized()
+							#mesh_normals.append(normal)
+					#else:
+					var normal = (vertex_b - vertex_a).cross(vertex_c - vertex_a)
+					mesh_normals.append(normal)
+					mesh_normals.append(normal)
+					mesh_normals.append(normal)
 					
 					mesh_vertices.append(vertex_a)
 					mesh_vertices.append(vertex_c)
@@ -198,9 +175,7 @@ func _generate_mesh_data() -> void:
 					i += 3
 
 ## Creates an ArrayMesh and assigned generated data to it. Then, creates a MeshInstance3D, assigns the ArrayMesh to it, and adds it to the scene
-func _build_mesh() -> void:
-	if verbose: print("building mesh from ", mesh_vertices.size(), " vertices...")
-	
+func _build_mesh() -> void:	
 	# package data needed to create the mesh
 	var mesh_indices: PackedInt32Array = []
 	for i in range(mesh_vertices.size()):
