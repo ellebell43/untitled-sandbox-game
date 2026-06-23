@@ -10,7 +10,7 @@ var noise: WorldNoise
 var player: Player
 var render_distance := 5
 
-var verbose := true
+var verbose := false
 
 var loaded_chunks: Dictionary[Vector3, Chunk] = {}
 var pending_tasks: Dictionary[int, Chunk] = {}

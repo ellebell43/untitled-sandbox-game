@@ -46,7 +46,7 @@ func get_valid_spawn_point() -> Vector3:
 		var sample_scalar = noise.sample(sample_pos.x, sample_pos.y, sample_pos.z)
 		if i != 1 and prev_scalar < 0 and sample_scalar > 0:
 			print("spawn location found: ", sample_pos)
-			return sample_pos - volume_center + direction * 2 # set spawn to be 2 meters above the point found to ensure player is above the mesh.
+			return sample_pos - volume_center + direction * 2 + global_position # set spawn to be 2 meters above the point found to ensure player is above the mesh.
 		prev_scalar = sample_scalar
 		i += 1
 	

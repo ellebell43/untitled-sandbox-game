@@ -9,7 +9,7 @@ const ROTATION_SPEED := 3
 const LOOK_SENSITIVITY := 0.005
 const MAX_VELOCITY := Vector3(30, 30, 30)
 
-var fly_mode := false
+var fly_mode := true
 var current_world: Planet = null
 
 @onready var camera: Camera3D = $Camera3D
