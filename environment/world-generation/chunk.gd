@@ -80,6 +80,7 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 	for x in size:# - 1:
 		for y in size:# - 1:
 			for z in size:# - 1:
+				if !scalar: return
 				# cube corner scalar values
 				var y_stride := size + 1
 				var x_stride := int(pow(size + 1, 2))
@@ -172,10 +173,11 @@ func genrate_mesh_data() -> void:
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it.
 func build_mesh() -> void:
 	# create the mesh instance, assign the mesh to it, and add it to the scene
-	var mesh_instace = MeshInstance3D.new()
-	mesh_instace.mesh = mesh_data
-	self.add_child(mesh_instace)
-	mesh_instace.create_trimesh_collision()
-	var collision_instance: StaticBody3D = mesh_instace.get_child(0)
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.mesh = mesh_data
+	self.add_child(mesh_instance)
+	mesh_instance.create_trimesh_collision()
+	
+	var collision_instance: StaticBody3D = mesh_instance.get_child(0)
 	collision_instance.set_collision_layer_value(2, true) # planet collision layer
 	collision_instance.set_collision_mask_value(1, true) # player collisions
