@@ -1,7 +1,6 @@
 extends Node3D
 class_name ChunkManager
 
-
 ## The size of each chunk
 var chunk_size := 20
 ## The number of chunks on each axis
@@ -14,6 +13,8 @@ var verbose := false
 
 var loaded_chunks: Dictionary[Vector3, Chunk] = {}
 var pending_tasks: Dictionary[int, Chunk] = {}
+var total_tasks_completed := 0
+var final_signal_emmited := false
 
 func _init( _player: Player, _seed: int, _diameter: int) -> void:
 	@warning_ignore("integer_division")
@@ -22,9 +23,13 @@ func _init( _player: Player, _seed: int, _diameter: int) -> void:
 	self.player = _player
 
 func _ready() -> void:
-	if verbose: print("Chunk manager ready. Total chunk count: ", pow(chunk_count, 3))		
+	if verbose: print("Chunk manager ready. Total chunk count: ", pow(chunk_count, 3))
+	#add_user_signal("chunk_task_completed", [{"name": "tasks_completed", "type": TYPE_INT}])
 
 func _process(_delta: float) -> void:
+	if not final_signal_emmited:
+		Utils.chunk_task_completed.emit(total_tasks_completed)
+		if total_tasks_completed >= 400: final_signal_emmited = true
 	var player_chunk_pos = get_player_chunk_pos()
 	# Iterate through chunks in render distance and load them
 	var chunk_min = player_chunk_pos - Vector3i(render_distance, render_distance, render_distance)
@@ -65,6 +70,7 @@ func _process(_delta: float) -> void:
 			if chunk != null and chunk.mesh_data != null:
 				chunk.build_mesh()
 			tasks_completed += 1
+			if not final_signal_emmited: total_tasks_completed += 1
 			pending_tasks.erase(id)
 
 func get_player_chunk_pos() -> Vector3i:

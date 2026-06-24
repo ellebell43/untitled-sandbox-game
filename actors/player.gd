@@ -11,10 +11,12 @@ const MAX_VELOCITY := Vector3(30, 30, 30)
 
 var fly_mode := true
 var current_world: Planet = null
+var allow_inputs := false
 
 @onready var camera: Camera3D = $Camera3D
 
 func _ready() -> void:
+	
 	if spawn_world:
 		global_position = spawn_world.get_valid_spawn_point()
 		#global_position = Vector3(spawn_world.world_radius, spawn_world.world_radius, spawn_world.world_radius)
@@ -75,6 +77,7 @@ func _physics_process(delta):
 var current_rotation: float = 0 # for camera x-axis rotation
 var ROTATION_LIMIT = deg_to_rad(90) # for camera x-axis rotation
 func _input(event):
+	if not allow_inputs: return
 	# if F is pressed, toggle flight_mode
 	if event.is_action_pressed("toggle_flight"):
 		fly_mode = not fly_mode

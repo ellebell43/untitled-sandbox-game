@@ -19,6 +19,10 @@ run/main_scene="uid://dmj3gcid0qbdm"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+Utils="*uid://f0gnvfwlqmwr"
+
 [filesystem]
 
 import/blender/enabled=false

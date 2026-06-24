@@ -33,6 +33,7 @@ func get_valid_spawn_point() -> Vector3:
 	var direction := Vector3(randf(), randf(), randf()).normalized()
 	# get a starting position that is at the center of the volume to start sampling + 1/4 of the way out of the volume
 	var volume_center := total_volume / 2
+	@warning_ignore("integer_division")
 	var starting_pos = volume_center + direction * ((diameter / 2) - 50) # start 50 steps below the median surface level
 	
 	# while loop variables
