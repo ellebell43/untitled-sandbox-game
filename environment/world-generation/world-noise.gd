@@ -2,7 +2,7 @@ class_name WorldNoise
 extends  Node
 
 var _noise := FastNoiseLite.new()
-var _amplitude := 1
+var _amplitude := 2
 ## where the general floor is located, relative to the center of the world
 var _floor: float
 ## center of the 3D volume

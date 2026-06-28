@@ -18,7 +18,7 @@ var lod_step : int
 
 var mesh_data : ArrayMesh
 
-func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int = 1):
+func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.size = _size
 	self.scalar = _noise
 	self.offset = _offset
@@ -33,9 +33,9 @@ func _construct_sample_set() -> PackedFloat32Array:
 		for y in size +  1:
 			for z in size +  1:
 				var sample := scalar.sample(
-					(x + offset.x) * lod_step, 
-					(y + offset.y) * lod_step, 
-					(z + offset.z) * lod_step
+					x * lod_step + offset.x, 
+					y * lod_step + offset.y, 
+					z * lod_step + offset.z
 				)
 				scalar_samples.append(sample)
 				if sample > isosurface: is_all_below = false
@@ -183,8 +183,9 @@ func build_mesh() -> void:
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.mesh = mesh_data
 	self.add_child(mesh_instance)
-	mesh_instance.create_trimesh_collision()
 	
-	var collision_instance: StaticBody3D = mesh_instance.get_child(0)
-	collision_instance.set_collision_layer_value(2, true) # planet collision layer
-	collision_instance.set_collision_mask_value(1, true) # player collisions
+	if lod_step == 1:
+		mesh_instance.create_trimesh_collision()
+		var collision_instance: StaticBody3D = mesh_instance.get_child(0)
+		collision_instance.set_collision_layer_value(2, true) # planet collision layer
+		collision_instance.set_collision_mask_value(1, true) # player collisions

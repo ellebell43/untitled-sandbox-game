@@ -3,8 +3,8 @@ extends Node3D
 
 @export var player: Player
 @export var world_seed: int = 1
-## diameter * 2.5 gives overall noise volume size that is used to generate the planet in
-@export var diameter: int = 100
+## 20 * 2^size = total_volume. totle_volume/2 = diameter. Size = max octree depth
+@export var size := 5
 @export var rotation_speed := .04
 @export var rotation_axis := Vector3(randf(), randf(), randf()).normalized()
 
@@ -12,12 +12,13 @@ extends Node3D
 
 var chunk_manager: ChunkManager
 var total_volume: Vector3
+var diameter: int
 
 func _ready() -> void:
-	total_volume = Vector3(diameter * 2, diameter * 2, diameter * 2)
-	
+	total_volume = Vector3(20 * pow(2, size), 20 * pow(2, size), 20 * pow(2, size))
+	diameter = int(total_volume.x / 2)
 	# determine overall size of volume and set the mesh to be at the center by placing that manager's origin and -radius
-	chunk_manager = ChunkManager.new(player, world_seed, diameter)
+	chunk_manager = ChunkManager.new(player, world_seed, size)
 	chunk_manager.position = -total_volume / 2 # place chunk_manger so that it's volumetric center lines up with the Planet node center
 	self.add_child(chunk_manager)
 	gravity_shape.shape.radius = diameter * 3

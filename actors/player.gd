@@ -11,7 +11,7 @@ const MAX_VELOCITY := Vector3(30, 30, 30)
 
 var fly_mode := true
 var current_world: Planet = null
-var allow_inputs := false
+var allow_inputs := true
 
 @onready var camera: Camera3D = $Camera3D
 
