@@ -58,11 +58,11 @@ A few principles baked into the ordering:
 
 ## Phase 6 - Threading (the core performance work, CPU only)
 
-- [ ] Split chunk work into two halves: data generation (sample field, run marching cubes, produce vertex/index/normal arrays and collision data) and upload (create the engine mesh and buffers)
-- [ ] Move data generation onto a worker thread or a job/thread pool so it runs off the game loop
-- [ ] Keep mesh and buffer creation on the main (render) thread, consuming finished data from a thread-safe queue (most engines require mesh upload on the main thread)
-- [ ] Confirm the game no longer stutters when chunks load or unload; profile to verify generation is off the main thread
-- [ ] Add a per-frame budget so only N chunk uploads happen per frame, avoiding main-thread spikes
+- [x] Split chunk work into two halves: data generation (sample field, run marching cubes, produce vertex/index/normal arrays and collision data) and upload (create the engine mesh and buffers)
+- [x] Move data generation onto a worker thread or a job/thread pool so it runs off the game loop
+- [x] Keep mesh and buffer creation on the main (render) thread, consuming finished data from a thread-safe queue (most engines require mesh upload on the main thread)
+- [x] Confirm the game no longer stutters when chunks load or unload; profile to verify generation is off the main thread
+- [x] Add a per-frame budget so only N chunk uploads happen per frame, avoiding main-thread spikes
 
 ## Phase 7 - Initial load experience
 
@@ -72,8 +72,8 @@ A few principles baked into the ordering:
 
 ## Phase 8 - LOD with Transvoxel (final robustness)
 
-- [ ] Define LOD bands: distance ranges at which chunks use lower resolution (larger cells)
-- [ ] Generate lower-resolution chunks for distant bands using the same density function at a coarser sampling step
+- [x] Define LOD bands: distance ranges at which chunks use lower resolution (larger cells) <- Changed to use Octree instead
+- [x] Generate lower-resolution chunks for distant bands using the same density function at a coarser sampling step
 - [ ] Implement Transvoxel transition cells between chunks of differing resolution to close the cracks at LOD boundaries
 - [ ] Address LOD popping (e.g. distance thresholds with hysteresis, or a short fade) so resolution changes are not jarring
 - [ ] Confirm seams are gone across all LOD boundaries while moving through the world
