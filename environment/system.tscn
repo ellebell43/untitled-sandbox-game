@@ -37,7 +37,7 @@ rounded = true
 
 [node name="Planet" parent="." unique_id=1766259659 node_paths=PackedStringArray("player") instance=ExtResource("3_wam8f")]
 player = NodePath("../Player")
-diameter = 1000
+diameter = 10000
 
 [node name="Player" parent="." unique_id=766571082 node_paths=PackedStringArray("spawn_world") instance=ExtResource("2_br15j")]
 spawn_world = NodePath("../Planet")

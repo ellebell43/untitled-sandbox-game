@@ -13,13 +13,16 @@ var scalar: WorldNoise = null
 var isosurface := 0.0
 ## Chunk space offset to apply to vertex positions
 var offset := Vector3(0, 0, 0)
+## The scale/resolution of the chunk. For use in octree traversal for LODs
+var lod_step : int
 
 var mesh_data : ArrayMesh
 
-func _init(_size: int, _noise: WorldNoise, _offset: Vector3):
+func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int = 1):
 	self.size = _size
 	self.scalar = _noise
 	self.offset = _offset
+	self.lod_step = _lod_step
 
 ## Returns either an array of scalar values to use in generating mesh data. The array has one copy of all needed scalar values to avoid sampling the same point multiple times. Null is returned when all points are above or below the surface, so no mesh should be generated
 func _construct_sample_set() -> PackedFloat32Array:
@@ -29,7 +32,11 @@ func _construct_sample_set() -> PackedFloat32Array:
 	for x in size +  1:
 		for y in size +  1:
 			for z in size +  1:
-				var sample := scalar.sample(x + offset.x, y + offset.y, z + offset.z)
+				var sample := scalar.sample(
+					(x + offset.x) * lod_step, 
+					(y + offset.y) * lod_step, 
+					(z + offset.z) * lod_step
+				)
 				scalar_samples.append(sample)
 				if sample > isosurface: is_all_below = false
 				if sample < isosurface: is_all_above = false
@@ -95,14 +102,14 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 				var corner_scalars = [c0, c1, c2, c3, c4, c5, c6, c7]
 				
 				# cube corner positions in space
-				var c0_pos = Vector3(x, y, z)
-				var c1_pos = Vector3((x + 1), y, z)
-				var c2_pos = Vector3((x + 1), y, (z + 1))
-				var c3_pos = Vector3(x, y, (z + 1))
-				var c4_pos = Vector3(x, (y + 1), z)
-				var c5_pos = Vector3((x + 1), (y + 1), z)
-				var c6_pos = Vector3((x + 1), (y + 1), (z + 1))
-				var c7_pos = Vector3(x, (y + 1), (z + 1))
+				var c0_pos = Vector3(x, y, z) * lod_step
+				var c1_pos = Vector3((x + 1), y, z) * lod_step
+				var c2_pos = Vector3((x + 1), y, (z + 1)) * lod_step
+				var c3_pos = Vector3(x, y, (z + 1)) * lod_step
+				var c4_pos = Vector3(x, (y + 1), z) * lod_step
+				var c5_pos = Vector3((x + 1), (y + 1), z) * lod_step
+				var c6_pos = Vector3((x + 1), (y + 1), (z + 1)) * lod_step
+				var c7_pos = Vector3(x, (y + 1), (z + 1)) * lod_step
 				var corner_pos = [c0_pos, c1_pos, c2_pos, c3_pos, c4_pos, c5_pos, c6_pos, c7_pos]
 				
 				# determine case index

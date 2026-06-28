@@ -5,9 +5,20 @@ class_name ChunkManager
 var chunk_size := 20
 ## The number of chunks on each axis
 var chunk_count: int
+## Scalar field that is used to determine the shape of the mesh along the chunks.
 var noise: WorldNoise
+## Reference to the palyer node
 var player: Player
+## The chunk scale distance a chunk must be in to be rendered at full resolution
 var render_distance := 5
+
+class LeafDictValue:
+	var chunk: Chunk
+	var lod_step: int
+	
+	func _init(_chunk: Chunk, _lod_step: int) -> void:
+		self.chunk = _chunk
+		self.lod_step = _lod_step
 
 var verbose := false
 
@@ -24,12 +35,12 @@ func _init( _player: Player, _seed: int, _diameter: int) -> void:
 
 func _ready() -> void:
 	if verbose: print("Chunk manager ready. Total chunk count: ", pow(chunk_count, 3))
-	#add_user_signal("chunk_task_completed", [{"name": "tasks_completed", "type": TYPE_INT}])
 
 func _process(_delta: float) -> void:
 	if not final_signal_emmited:
 		Utils.chunk_task_completed.emit(total_tasks_completed)
 		if total_tasks_completed >= 400: final_signal_emmited = true
+	
 	var player_chunk_pos = get_player_chunk_pos()
 	# Iterate through chunks in render distance and load them
 	var chunk_min = player_chunk_pos - Vector3i(render_distance, render_distance, render_distance)
@@ -43,7 +54,6 @@ func _process(_delta: float) -> void:
 				var current_chunk_pos = Vector3i(chunk_x, chunk_y, chunk_z)
 				# If current_chunk_pos is within the render distance of the player_chunk_pos, and it's not in the loaded dictionary, load the chunk
 				if (player_chunk_pos).distance_to(current_chunk_pos) < render_distance and not loaded_chunks.has(current_chunk_pos):
-					#print("distance to chunk being loaded: ", current_chunk_pos.distance_to(player_chunk_pos))
 					load_chunk(current_chunk_pos)
 				chunk_z += 1
 			chunk_y += 1
@@ -95,3 +105,12 @@ func unload_chunk(chunk_pos: Vector3i) -> void:
 		pending_tasks.erase(task_id)
 	loaded_chunks.erase(chunk_pos)
 	if chunk_to_unload: chunk_to_unload.queue_free()
+
+func traverse_octree() -> Dictionary[Vector3, LeafDictValue]:
+	var leaf_set: Dictionary[Vector3, LeafDictValue] = {}
+	var current_octree_depth := 0
+	var max_octree_depth: int = chunk_count * chunk_size
+	# Set to somewhere from 1 to 4. The higher the value, the more eagerly octree cells subdivide
+	var distance_factor := 1
+	
+	return leaf_set
