@@ -34,9 +34,7 @@ A few principles baked into the ordering:
 - [x] Render the triangles unlit to confirm topology is correct before adding interpolation
 - [x] Add linear interpolation along each crossed edge to position vertices precisely; confirm the surface smooths
 - [x] Compute per-vertex normals from the gradient of the scalar field using finite differences (sample plus and minus along each axis, subtract, normalize)
-- [ ] Add a debug mode that draws normals as short lines to verify they point outward
 - [x] Build the final mesh (vertices, normals, indices) and render it lit
-- [ ] Optional: weld shared vertices to reduce vertex count. Note this is for memory only; smooth normals already come from the field gradient
 
 ## Phase 3 - Make it terrain (still a single block)
 
@@ -46,25 +44,25 @@ A few principles baked into the ordering:
 
 ## Phase 4 - Chunking on the CPU (single resolution)
 
-- [ ] Decide a chunk size (cells per chunk) and a default render distance measured in chunks
-- [ ] Generate a single chunk at an arbitrary world offset by sampling the global density function at that chunk's coordinates (a chunk is just a window into the infinite field)
-- [ ] Implement the apron: when meshing a chunk, sample one extra cell beyond each boundary so border triangles align with neighbors. Verify two adjacent chunks have no crack between them
-- [ ] Generate and display a grid of chunks out to the render distance around the camera, all on the main thread for now (expect a hitch; that is acceptable at this stage)
-- [ ] Add chunk loading and unloading: create chunks that enter range as the camera moves, and remove chunks that leave it
+- [x] Decide a chunk size (cells per chunk) and a default render distance measured in chunks
+- [x] Generate a single chunk at an arbitrary world offset by sampling the global density function at that chunk's coordinates (a chunk is just a window into the infinite field)
+- [x] Implement the apron: when meshing a chunk, sample one extra cell beyond each boundary so border triangles align with neighbors. Verify two adjacent chunks have no crack between them
+- [x] Generate and display a grid of chunks out to the render distance around the camera, all on the main thread for now (expect a hitch; that is acceptable at this stage)
+- [x] Add chunk loading and unloading: create chunks that enter range as the camera moves, and remove chunks that leave it
 
 ## Phase 5 - Collision
 
-- [ ] Generate a collision mesh for each chunk from its mesh data (full resolution or a simplified version, depending on your physics budget)
-- [ ] Hook chunk collision into your physics engine and confirm the player and objects collide with the terrain
-- [ ] Ensure collision meshes are removed when their chunk unloads
+- [x] Generate a collision mesh for each chunk from its mesh data (full resolution or a simplified version, depending on your physics budget)
+- [x] Hook chunk collision into your physics engine and confirm the player and objects collide with the terrain
+- [x] Ensure collision meshes are removed when their chunk unloads
 
 ## Phase 6 - Threading (the core performance work, CPU only)
 
-- [ ] Split chunk work into two halves: data generation (sample field, run marching cubes, produce vertex/index/normal arrays and collision data) and upload (create the engine mesh and buffers)
-- [ ] Move data generation onto a worker thread or a job/thread pool so it runs off the game loop
-- [ ] Keep mesh and buffer creation on the main (render) thread, consuming finished data from a thread-safe queue (most engines require mesh upload on the main thread)
-- [ ] Confirm the game no longer stutters when chunks load or unload; profile to verify generation is off the main thread
-- [ ] Add a per-frame budget so only N chunk uploads happen per frame, avoiding main-thread spikes
+- [x] Split chunk work into two halves: data generation (sample field, run marching cubes, produce vertex/index/normal arrays and collision data) and upload (create the engine mesh and buffers)
+- [x] Move data generation onto a worker thread or a job/thread pool so it runs off the game loop
+- [x] Keep mesh and buffer creation on the main (render) thread, consuming finished data from a thread-safe queue (most engines require mesh upload on the main thread)
+- [x] Confirm the game no longer stutters when chunks load or unload; profile to verify generation is off the main thread
+- [x] Add a per-frame budget so only N chunk uploads happen per frame, avoiding main-thread spikes
 
 ## Phase 7 - Initial load experience
 
@@ -74,15 +72,15 @@ A few principles baked into the ordering:
 
 ## Phase 8 - LOD with Transvoxel (final robustness)
 
-- [ ] Define LOD bands: distance ranges at which chunks use lower resolution (larger cells)
-- [ ] Generate lower-resolution chunks for distant bands using the same density function at a coarser sampling step
+- [x] Define LOD bands: distance ranges at which chunks use lower resolution (larger cells) <- Changed to use Octree instead
+- [x] Generate lower-resolution chunks for distant bands using the same density function at a coarser sampling step
 - [ ] Implement Transvoxel transition cells between chunks of differing resolution to close the cracks at LOD boundaries
 - [ ] Address LOD popping (e.g. distance thresholds with hysteresis, or a short fade) so resolution changes are not jarring
 - [ ] Confirm seams are gone across all LOD boundaries while moving through the world
 
 ## Phase 9 - Optional CPU-friendly optimizations (no GPU or compute shaders)
 
-- [ ] Skip empty or full chunks early: if all corners of a chunk are entirely inside or entirely outside, generate no mesh
+- [x] Skip empty or full chunks early: if all corners of a chunk are entirely inside or entirely outside, generate no mesh
 - [ ] Pool and reuse the vertex and index buffers per worker to reduce allocations and garbage
 - [ ] Cache or persist generated chunk data so revisited areas reload without recomputation
 - [ ] Optional mesh simplification or decimation for distant chunks if Transvoxel LOD alone is not enough
