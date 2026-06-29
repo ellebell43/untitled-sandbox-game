@@ -72,7 +72,7 @@ func _process(_delta: float) -> void:
 			if not final_signal_emmited: total_tasks_completed += 1
 			pending_tasks.erase(id)
 
-func octree_iterate(depth: int = 1, parent_pos: Vector3i = Vector3.ZERO) -> void:
+func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void:
 	var cell_size := int(root_node_size / pow(2, depth))
 	# iterate through cells at this octree depth and either continue iterating, or append to new leaf set depending on distance to player
 	for _x in 2:
