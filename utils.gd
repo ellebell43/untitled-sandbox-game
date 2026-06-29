@@ -3,6 +3,8 @@ extends Node3D
 @warning_ignore("unused_signal")
 signal chunk_task_completed(tasks_completed: int)
 
+var verbose := true
+
 #static func parse_time(time: int) -> String:
 	#var MICRO: int = 1
 	#var MILLISECOND: int = 1000

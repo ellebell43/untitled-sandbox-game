@@ -4,9 +4,9 @@ extends Node3D
 # ============ BASIC CHUNK CHARACTERISTICS ============
 
 ## The amount of points along the x, y, and z axis
-var size : int
+var size: int
 ## Seed of the terrain generation
-var world_seed : int
+var world_seed: int
 ## noise volume to use for generating mesh data
 var scalar: WorldNoise = null
 ## The value of the scalar field that represents the surface of the mesh
@@ -14,9 +14,9 @@ var isosurface := 0.0
 ## Chunk space offset to apply to vertex positions
 var offset := Vector3(0, 0, 0)
 ## The scale/resolution of the chunk. For use in octree traversal for LODs
-var lod_step : int
-
-var mesh_data : ArrayMesh
+var lod_step: int
+## The data for the mesh of this chunk. Generated in _generate_mesh_data
+var mesh_data: ArrayMesh
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.size = _size
@@ -29,26 +29,25 @@ func _construct_sample_set() -> PackedFloat32Array:
 	var scalar_samples: PackedFloat32Array = []
 	var is_all_above := true
 	var is_all_below := true
-	for x in size +  1:
-		for y in size +  1:
-			for z in size +  1:
+	for x in size + 1:
+		for y in size + 1:
+			for z in size + 1:
 				var sample := scalar.sample(
-					x * lod_step + offset.x, 
-					y * lod_step + offset.y, 
+					x * lod_step + offset.x,
+					y * lod_step + offset.y,
 					z * lod_step + offset.z
 				)
 				scalar_samples.append(sample)
 				if sample > isosurface: is_all_below = false
 				if sample < isosurface: is_all_above = false
 	
-	if is_all_above or is_all_below: 
+	if is_all_above or is_all_below:
 		return []
 	else:
 		return scalar_samples
 
 ## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assignes the generated data to mesh_vertices and mesh_data
 func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
-	
 	#    c4---------e4-------------c5
 	# e6 / |                    e5 /|
 	#   /  |                      / | 
@@ -61,32 +60,30 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 	#  |  / e3                   | /
 	#  | /                       |/ e1
 	# c3-----------e2-----------c2
-	
 	# 8-bit case index = c0*1 + c1*2 + c2*4 + c3*8 + c4*16 + c5*32 + c6*64 + c7*128
-	
 	# the two corners each edge connects
-	const EDGE_CORNERS := [ 
-		[0, 1], 
-		[1, 2], 
-		[2, 3], 
+	const EDGE_CORNERS := [
+		[0, 1],
+		[1, 2],
+		[2, 3],
 		[3, 0],
-		[4, 5], 
-		[5, 6], 
-		[6, 7], 
+		[4, 5],
+		[5, 6],
+		[6, 7],
 		[7, 4],
 		[0, 4],
 		[1, 5],
 		[2, 6],
 		[3, 7]
-	] 
+	]
 	# Arrays for storing generated mesh data
 	var mesh_vertices: PackedVector3Array = []
 	var mesh_normals: PackedVector3Array = []
 	
 	# Loop through each cube and generate vertices and normals for that cube
-	for x in size:# - 1:
-		for y in size:# - 1:
-			for z in size:# - 1:
+	for x in size: # - 1:
+		for y in size: # - 1:
+			for z in size: # - 1:
 				if !scalar: return
 				# cube corner scalar values
 				var y_stride := size + 1
@@ -124,12 +121,12 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 				if c7 < isosurface: case_index |= (1 << 7)
 				var segment = MarchingCubesLUT.TRI_TABLE[case_index]
 				
-				# determine where vertices go in real space and determine normals for each vertex
-				var i:= 0
+				# determine where mesh vertices go in real space and determine normals for each mesh vertex (uses flat shading on purpose)
+				var i := 0
 				while i < segment.size() and segment[i] != -1:
-					var edge_a = segment [i]
-					var edge_b = segment [i + 1]
-					var edge_c = segment [i + 2]
+					var edge_a = segment[i]
+					var edge_b = segment[i + 1]
+					var edge_c = segment[i + 2]
 					var vertex_a: Vector3
 					var vertex_b: Vector3
 					var vertex_c: Vector3
@@ -171,13 +168,13 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
 	return array_mesh
 
-## Returns ArrayMesh data for building a MeshInstance3D for this chunk. Returns null if no MeshInstance should be created
-func genrate_mesh_data() -> void:
+## constructs ArrayMesh data for building a MeshInstance3D for this chunk. mesh_data will be null if no data is/should be generated. Should be done off the main game thread.
+func generate_mesh_data() -> void:
 	var scalar_samples = _construct_sample_set()
 	if scalar_samples.size() == 0: mesh_data = null; return
 	mesh_data = _generate_mesh_data(scalar_samples)
 
-## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it.
+## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it. 
 func build_mesh() -> void:
 	# create the mesh instance, assign the mesh to it, and add it to the scene
 	var mesh_instance = MeshInstance3D.new()
