@@ -50,14 +50,17 @@ func _process(_delta: float) -> void:
 	# If a player position hasn't been recorded yet, iterate through the octree for the first time, compare leaf sets (loads new_leaf_set into leaf_set to load chunks in), and record player position
 	if not prev_player_pos:
 		octree_iterate()
-		compare_leaf_sets()
+		load_new_chunks()
 		prev_player_pos = player.position
 	# When the player passes the movement threshold, store the new position, clear the new leaf set, re-iterate through the octree, and compare leaf sets to update chunks
 	if player.position.distance_to(prev_player_pos) >= player_movement_threshold:
 		prev_player_pos = player.position
 		new_leaf_set = []
 		octree_iterate()
-		compare_leaf_sets()
+		load_new_chunks()
+	
+	if pending_tasks.size() == 0:
+		unload_old_chunks()
 	
 	# Iterate through pending tasks (created from leaf_set chunks; see load_octree_chunk()) and add a maximum of 10 meshs to the scene tree per frame
 	const MAXIMUM_TASK_COMPLETIONS = 10
@@ -103,13 +106,15 @@ func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void
 					new_leaf_set.append([Vector3i(cell_pos), lod_step])
 
 ## Take new_leaf_set and leaf_set and determine chunks to load and unload
-func compare_leaf_sets() -> void:
-	var keys = leaf_set.keys()
+func load_new_chunks() -> void:
 	# el : Array[chunk_pos, lod_step]
 	for el in new_leaf_set:
 		# if item in new leaf set isn't in the dictionary, load it.
 		if not leaf_set.has(el):
 			load_octree_chunk(el[0], el[1])
+	
+func unload_old_chunks():
+	var keys = leaf_set.keys()
 	# key : Array[chunk_pos, lod_step]
 	for key in keys:
 		# if key cannot be found in new_leaf_set, unload that chunk
