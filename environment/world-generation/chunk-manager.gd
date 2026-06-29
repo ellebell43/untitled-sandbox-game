@@ -25,9 +25,9 @@ var distance_factor := 2
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
 var root_node_size: int
 ## Dictionary[[position, lod_level], chunk]. The current set of octree chunks loaded into the scene
-var leaf_set: Dictionary[Array, Chunk] = {}
-## Array[position: Vector3, lod_level: int] <- equates to a key to be set in the current leaf dictionary. Is used to compare against leaf_set and unload chunks that should no longer be loaded in
-var new_leaf_set: Array = []
+var current_chunk_set: Dictionary[Array, Chunk] = {}
+## Array[position: Vector3, lod_level: int] <- equates to a key to be set in the current leaf dictionary. Is used to compare against current_chunk_set and unload chunks that should no longer be loaded in
+var new_chunk_set: Array = []
 ## The maximum depth that the octree will go to. Same as Planet.size. (20 * 2^size = WorldNoise.size)
 var max_octree_depth: int
 ## The previously recorder player position. Used to only iterate through the octree when the player moves player_movement_threshold meters
@@ -47,7 +47,7 @@ func _ready() -> void:
 	if Utils.verbose: print("Chunk manager ready. Total chunk count: ", int(pow(chunk_count, 3)))
 
 func _process(_delta: float) -> void:
-	# If a player position hasn't been recorded yet, iterate through the octree for the first time, compare leaf sets (loads new_leaf_set into leaf_set to load chunks in), and record player position
+	# If a player position hasn't been recorded yet, iterate through the octree for the first time, compare leaf sets (loads new_chunk_set into current_chunk_set to load chunks in), and record player position
 	if not prev_player_pos:
 		octree_iterate()
 		load_new_chunks()
@@ -55,14 +55,14 @@ func _process(_delta: float) -> void:
 	# When the player passes the movement threshold, store the new position, clear the new leaf set, re-iterate through the octree, and compare leaf sets to update chunks
 	if player.position.distance_to(prev_player_pos) >= player_movement_threshold:
 		prev_player_pos = player.position
-		new_leaf_set = []
+		new_chunk_set = []
 		octree_iterate()
 		load_new_chunks()
 	
 	if pending_tasks.size() == 0:
 		unload_old_chunks()
 	
-	# Iterate through pending tasks (created from leaf_set chunks; see load_octree_chunk()) and add a maximum of 10 meshs to the scene tree per frame
+	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) and add a maximum of 10 meshs to the scene tree per frame
 	const MAXIMUM_TASK_COMPLETIONS = 10
 	var tasks_completed = 0
 	var pending_keys = pending_tasks.keys()
@@ -87,7 +87,7 @@ func _process(_delta: float) -> void:
 			# Remove the task from the set of pending tasks once it's finished
 			pending_tasks.erase(id)
 
-## Iterate through the octree, starting at the root node, and determine what chunks need to be split until depth reaches max_octree_depth. Add chunks to new_leaf_set to be compared against leaf_set later
+## Iterate through the octree, starting at the root node, and determine what chunks need to be split until depth reaches max_octree_depth. Add chunks to new_chunk_set to be compared against current_chunk_set later
 func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void:
 	var cell_size := int(root_node_size / pow(2, depth))
 	# iterate through cells at this octree depth and either continue iterating, or append to new leaf set depending on distance to player
@@ -103,22 +103,23 @@ func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void
 				else:
 					@warning_ignore("integer_division")
 					var lod_step := cell_size / chunk_size
-					new_leaf_set.append([Vector3i(cell_pos), lod_step])
+					new_chunk_set.append([Vector3i(cell_pos), lod_step])
 
-## Take new_leaf_set and leaf_set and determine chunks to load and unload
+## Compare new_chunk_set vs current_chunk_set and determine chunks to load and load them
 func load_new_chunks() -> void:
 	# el : Array[chunk_pos, lod_step]
-	for el in new_leaf_set:
-		# if item in new leaf set isn't in the dictionary, load it.
-		if not leaf_set.has(el):
+	for el in new_chunk_set:
+		# if item in new_chunk_set set isn't in current_chunk_set, load it.
+		if not current_chunk_set.has(el):
 			load_octree_chunk(el[0], el[1])
-	
+
+## Compare current_chunk_set vs new_chunk_set and determine which chunks shoul be unloaded and unload them
 func unload_old_chunks():
-	var keys = leaf_set.keys()
+	var keys = current_chunk_set.keys()
 	# key : Array[chunk_pos, lod_step]
 	for key in keys:
-		# if key cannot be found in new_leaf_set, unload that chunk
-		var should_stay_in_set := new_leaf_set.find(key)
+		# if key cannot be found in new_chunk_set, unload that chunk
+		var should_stay_in_set := new_chunk_set.find(key)
 		if should_stay_in_set == -1:
 			unload_octree_chunk(key[0], key[1])
 
@@ -127,7 +128,7 @@ func load_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 	var new_chunk = Chunk.new(chunk_size, noise, chunk_pos, lod_step)
 	self.add_child(new_chunk)
 	new_chunk.position = chunk_pos
-	leaf_set.set([chunk_pos, lod_step], new_chunk)
+	current_chunk_set.set([chunk_pos, lod_step], new_chunk)
 	
 	# use threads to generate mesh data
 	var task_id = WorkerThreadPool.add_task(new_chunk.generate_mesh_data)
@@ -135,7 +136,7 @@ func load_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 
 ## Ensure a Chunks pending thread task is completed, then remove the chunk from the scene and the leaf set. Remove the task id from pending tasks as well.
 func unload_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
-	var chunk_to_unload: Chunk = leaf_set.get([chunk_pos, lod_step])
+	var chunk_to_unload: Chunk = current_chunk_set.get([chunk_pos, lod_step])
 	
 	# ensure thread task is complete before removing the chunk
 	var task_id = pending_tasks.find_key(chunk_to_unload)
@@ -144,5 +145,7 @@ func unload_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 		pending_tasks.erase(task_id)
 		
 	# remove chunk from leaf set and remove Chunk from scene tree if possible.
-	leaf_set.erase([chunk_pos, lod_step])
-	if chunk_to_unload: chunk_to_unload.queue_free()
+	current_chunk_set.erase([chunk_pos, lod_step])
+	if chunk_to_unload:
+		# TO DO: Fade chunk out before removing. Set material transperency mode to TRANSPARENCY_ALPHA_HASH and Tween.
+		chunk_to_unload.queue_free()
