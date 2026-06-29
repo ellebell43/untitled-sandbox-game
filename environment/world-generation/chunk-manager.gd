@@ -93,10 +93,12 @@ func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void
 		for _y in 2:
 			for _z in 2:
 				var cell_pos = parent_pos + Vector3i(cell_size * _x, cell_size * _y, cell_size * _z)
+				@warning_ignore("integer_division")
 				var cell_center = cell_pos + Vector3i(cell_size / 2, cell_size / 2, cell_size / 2)
 				if cell_center.distance_to(to_local(player.global_position)) < cell_size * distance_factor and depth < max_octree_depth:
 					octree_iterate(depth + 1, cell_pos)
 				else:
+					@warning_ignore("integer_division")
 					var lod_step := cell_size / chunk_size
 					new_leaf_set.append([Vector3i(cell_pos), lod_step])
 
