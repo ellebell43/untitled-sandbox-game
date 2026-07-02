@@ -95,10 +95,11 @@ func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void
 	for _x in 2:
 		for _y in 2:
 			for _z in 2:
-				var cell_pos = parent_pos + Vector3i(cell_size * _x, cell_size * _y, cell_size * _z)
-				@warning_ignore("integer_division")
-				var cell_center = cell_pos + Vector3i(cell_size / 2, cell_size / 2, cell_size / 2)
-				if cell_center.distance_to(to_local(player.global_position)) < cell_size * distance_factor and depth < max_octree_depth:
+				# Get distance to edge of cell and use that to determine if the cell should render or split
+				var cell_pos = Vector3(parent_pos) + Vector3(cell_size * _x, cell_size * _y, cell_size * _z)
+				var player_pos := to_local(player.global_position)
+				var player_pos_clamped := player_pos.clamp(cell_pos, Vector3(cell_size, cell_size, cell_size) + cell_pos)
+				if player_pos_clamped.distance_to(to_local(player.global_position)) < cell_size * distance_factor and depth < max_octree_depth:
 					octree_iterate(depth + 1, cell_pos)
 				else:
 					@warning_ignore("integer_division")
