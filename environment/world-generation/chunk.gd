@@ -178,6 +178,7 @@ func generate_mesh_data() -> void:
 func build_mesh() -> void:
 	# create the mesh instance, assign the mesh to it, and add it to the scene
 	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.name = "ChunkMesh"
 	mesh_instance.mesh = mesh_data
 	self.add_child(mesh_instance)
 	

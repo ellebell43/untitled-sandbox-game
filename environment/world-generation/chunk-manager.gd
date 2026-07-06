@@ -21,7 +21,7 @@ var max_signals_emmited := 1000
 ## When true, total_tasks_completed will no longer be tracked. Everytime a task completes a signal is emmited. For use in a loading screen.
 var final_signal_emmited := false
 ## How eagerly chunks split into finer chunks. The higher the number, the greater the distance gate to determine how fine the chunk is. 
-var distance_factor := 2
+var distance_factor := 1.5
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
 var root_node_size: int
 ## Dictionary[[position, lod_level], chunk]. The current set of octree chunks loaded into the scene
@@ -59,11 +59,11 @@ func _process(_delta: float) -> void:
 		octree_iterate()
 		load_new_chunks()
 	
-	if pending_tasks.size() == 0:
-		unload_old_chunks()
+	#if pending_tasks.size() == 0:
+	unload_old_chunks()
 	
 	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) and add a maximum of 10 meshs to the scene tree per frame
-	const MAXIMUM_TASK_COMPLETIONS = 10
+	const MAXIMUM_TASK_COMPLETIONS = 20
 	var tasks_completed = 0
 	var pending_keys = pending_tasks.keys()
 
@@ -148,5 +148,13 @@ func unload_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 	# remove chunk from leaf set and remove Chunk from scene tree if possible.
 	current_chunk_set.erase([chunk_pos, lod_step])
 	if chunk_to_unload:
-		# TO DO: Fade chunk out before removing. Set material transperency mode to TRANSPARENCY_ALPHA_HASH and Tween.
-		chunk_to_unload.queue_free()
+		var mesh_instance = chunk_to_unload.find_child("ChunkMesh", true, false)
+		#print(chunk_to_unload.get_children(true))
+		if mesh_instance:
+			var tween = create_tween()
+			tween.tween_property(mesh_instance, "transparency", 1, 1)
+			tween.tween_callback(chunk_to_unload.queue_free)
+		else:
+			chunk_to_unload.queue_free()
+		
+		#chunk_to_unload.queue_free()
