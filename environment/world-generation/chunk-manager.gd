@@ -7,7 +7,7 @@ var chunk_size := 20
 var chunk_count: int
 ## Scalar field that is used to determine the shape of the mesh along the chunks.
 var noise: WorldNoise
-## Reference to the palyer node
+## Reference to the player node
 var player: Player
 
 # ========== CHUNK MANAGEMENT VARIABLES ==========
@@ -17,9 +17,9 @@ var pending_tasks: Dictionary[int, Chunk] = {}
 ## Tracks total tasks completed and stops increasing after a set number of tasks (defined in the moment, further down)
 var total_tasks_completed := 0
 ## Maximum "task completed" signals to emit.
-var max_signals_emmited := 1000
-## When true, total_tasks_completed will no longer be tracked. Everytime a task completes a signal is emmited. For use in a loading screen.
-var final_signal_emmited := false
+var max_signals_emitted := 1000
+## When true, total_tasks_completed will no longer be tracked. Every time a task completes a signal is emitted. For use in a loading screen.
+var final_signal_emitted := false
 ## How eagerly chunks split into finer chunks. The higher the number, the greater the distance gate to determine how fine the chunk is. 
 var distance_factor := 1.5
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
@@ -62,7 +62,7 @@ func _process(_delta: float) -> void:
 	#if pending_tasks.size() == 0:
 	unload_old_chunks()
 	
-	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) and add a maximum of 10 meshs to the scene tree per frame
+	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) and add a maximum of 10 meshes to the scene tree per frame
 	const MAXIMUM_TASK_COMPLETIONS = 20
 	var tasks_completed = 0
 	var pending_keys = pending_tasks.keys()
@@ -79,10 +79,10 @@ func _process(_delta: float) -> void:
 				chunk.build_mesh()
 			tasks_completed += 1
 			# If we haven't emited to max_signals_emitted, increment total_tasks completed and emit chunk_task_completed
-			if not final_signal_emmited:
+			if not final_signal_emitted:
 				total_tasks_completed += 1
 				Utils.chunk_task_completed.emit(total_tasks_completed)
-				if total_tasks_completed >= max_signals_emmited: final_signal_emmited = true
+				if total_tasks_completed >= max_signals_emitted: final_signal_emitted = true
 
 			# Remove the task from the set of pending tasks once it's finished
 			pending_tasks.erase(id)
@@ -114,7 +114,7 @@ func load_new_chunks() -> void:
 		if not current_chunk_set.has(el):
 			load_octree_chunk(el[0], el[1])
 
-## Compare current_chunk_set vs new_chunk_set and determine which chunks shoul be unloaded and unload them
+## Compare current_chunk_set vs new_chunk_set and determine which chunks should be unloaded and unload them
 func unload_old_chunks():
 	var keys = current_chunk_set.keys()
 	# key : Array[chunk_pos, lod_step]
