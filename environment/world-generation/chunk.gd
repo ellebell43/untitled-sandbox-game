@@ -3,6 +3,8 @@ extends Node3D
 
 # ============ BASIC CHUNK CHARACTERISTICS ============
 
+enum chunk_state {PROCESSING, ACTIVE, RETIRING, READY_TO_DIE}
+
 ## The amount of points along the x, y, and z axis
 var size: int
 ## Seed of the terrain generation
@@ -17,6 +19,8 @@ var offset := Vector3(0, 0, 0)
 var lod_step: int
 ## The data for the mesh of this chunk. Generated in _generate_mesh_data
 var mesh_data: ArrayMesh
+## Is either PROCESSING, ACTIVE, or PENDING and is used to ensure that other chunks are loaded in before this chunk free itself to prevent LOD "popping"
+var state := chunk_state.PROCESSING
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.size = _size
@@ -46,7 +50,7 @@ func _construct_sample_set() -> PackedFloat32Array:
 	else:
 		return scalar_samples
 
-## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assignes the generated data to mesh_vertices and mesh_data
+## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assigns the generated data to mesh_vertices and mesh_data
 func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 	#    c4---------e4-------------c5
 	# e6 / |                    e5 /|

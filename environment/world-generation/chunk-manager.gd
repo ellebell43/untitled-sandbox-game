@@ -24,16 +24,22 @@ var final_signal_emitted := false
 var distance_factor := 1.5
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
 var root_node_size: int
-## Dictionary[[position, lod_level], chunk]. The current set of octree chunks loaded into the scene
-var current_chunk_set: Dictionary[Array, Chunk] = {}
-## Array[position: Vector3, lod_level: int] <- equates to a key to be set in the current leaf dictionary. Is used to compare against current_chunk_set and unload chunks that should no longer be loaded in
-var new_chunk_set: Array = []
 ## The maximum depth that the octree will go to. Same as Planet.size. (20 * 2^size = WorldNoise.size)
 var max_octree_depth: int
 ## The previously recorder player position. Used to only iterate through the octree when the player moves player_movement_threshold meters
 var prev_player_pos: Vector3
 ## Used to determine when the octree should be iterated through to prevent a per-frame iteration.
 var player_movement_threshold := 10
+var first_iteration_complete := false
+
+# ========== CHUNK SET DICTIONARIES ==========
+
+# Dictionary[[position, lod_level], chunk].
+var new_chunk_set: Dictionary[Array, int] = {} # value int is unimportant and never used
+var pending_chunk_set: Dictionary[Array, Chunk] = {}
+var active_chunk_set: Dictionary[Array, Chunk] = {}
+var retiring_chunk_set: Dictionary[Array, Chunk] = {}
+var ready_to_die_chunk_set: Dictionary[Array, Chunk] = {}
 
 func _init(_player: Player, _seed: int, _max_octree_depth: int) -> void:
 	self.max_octree_depth = _max_octree_depth
@@ -48,20 +54,23 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	# If a player position hasn't been recorded yet, iterate through the octree for the first time, compare leaf sets (loads new_chunk_set into current_chunk_set to load chunks in), and record player position
-	if not prev_player_pos:
+	if not first_iteration_complete:
 		octree_iterate()
 		load_new_chunks()
 		prev_player_pos = player.position
+		first_iteration_complete = true
 	# When the player passes the movement threshold, store the new position, clear the new leaf set, re-iterate through the octree, and compare leaf sets to update chunks
 	if player.position.distance_to(prev_player_pos) >= player_movement_threshold:
 		prev_player_pos = player.position
-		new_chunk_set = []
+		new_chunk_set.clear()
 		octree_iterate()
 		load_new_chunks()
 	
-	#if pending_tasks.size() == 0:
-	unload_old_chunks()
-	
+	# unload_old_chunks()
+	mark_retiring_chunks()
+	check_retiring_chunks()
+	kill_dead_chunks()
+
 	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) and add a maximum of 10 meshes to the scene tree per frame
 	const MAXIMUM_TASK_COMPLETIONS = 20
 	var tasks_completed = 0
@@ -74,11 +83,17 @@ func _process(_delta: float) -> void:
 		if WorkerThreadPool.is_task_completed(id):
 			WorkerThreadPool.wait_for_task_completion(id)
 			
-			var chunk = pending_tasks.get(id)
-			if chunk != null and chunk.mesh_data != null:
-				chunk.build_mesh()
+			var chunk: Chunk = pending_tasks.get(id)
+			
+			if chunk != null:
+				chunk.state = Chunk.chunk_state.ACTIVE
+				var key = [Vector3i(chunk.position), chunk.lod_step]
+				if chunk.mesh_data != null: chunk.build_mesh()
+				active_chunk_set.set(key, chunk)
+				pending_chunk_set.erase(key)
+
 			tasks_completed += 1
-			# If we haven't emited to max_signals_emitted, increment total_tasks completed and emit chunk_task_completed
+			# If we haven't emitted to max_signals_emitted, increment total_tasks completed and emit chunk_task_completed
 			if not final_signal_emitted:
 				total_tasks_completed += 1
 				Utils.chunk_task_completed.emit(total_tasks_completed)
@@ -104,40 +119,114 @@ func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void
 				else:
 					@warning_ignore("integer_division")
 					var lod_step := cell_size / chunk_size
-					new_chunk_set.append([Vector3i(cell_pos), lod_step])
+					new_chunk_set.set([Vector3i(cell_pos), lod_step], 0)
 
-## Compare new_chunk_set vs current_chunk_set and determine chunks to load and load them
+## Compare new_chunk_set vs pending_chunk_set and active_chunk_set to determine chunks to load and then load them
 func load_new_chunks() -> void:
-	# el : Array[chunk_pos, lod_step]
-	for el in new_chunk_set:
-		# if item in new_chunk_set set isn't in current_chunk_set, load it.
-		if not current_chunk_set.has(el):
-			load_octree_chunk(el[0], el[1])
-
-## Compare current_chunk_set vs new_chunk_set and determine which chunks should be unloaded and unload them
-func unload_old_chunks():
-	var keys = current_chunk_set.keys()
 	# key : Array[chunk_pos, lod_step]
-	for key in keys:
-		# if key cannot be found in new_chunk_set, unload that chunk
-		var should_stay_in_set := new_chunk_set.find(key)
-		if should_stay_in_set == -1:
-			unload_octree_chunk(key[0], key[1])
+	for key in new_chunk_set.keys():
+		if ready_to_die_chunk_set.has(key):
+			active_chunk_set.set(key, ready_to_die_chunk_set[key])
+			active_chunk_set.get(key).state = Chunk.chunk_state.ACTIVE
+			ready_to_die_chunk_set.erase(key)
+		elif retiring_chunk_set.has(key):
+			active_chunk_set.set(key, retiring_chunk_set[key])
+			active_chunk_set.get(key).state = Chunk.chunk_state.ACTIVE
+			retiring_chunk_set.erase(key)
+		elif not pending_chunk_set.has(key) and not active_chunk_set.has(key):
+			load_octree_chunk(key[0], key[1])
+
+## Compare active_chunk_set with new_chunk_set and move chunks from active to retiring.
+func mark_retiring_chunks() -> void:
+	var keys_to_move = []
+
+	# Intentionally do not scan through pending chunks, as they most likely have a thread that cannot be killed part way through.
+	for key in active_chunk_set.keys(): # key: [pos: Vector3, lod_step: int]
+		var stay_active := new_chunk_set.has(key)
+		if not stay_active and active_chunk_set[key].state != Chunk.chunk_state.RETIRING:
+			keys_to_move.append(key)
+	
+	for key in keys_to_move:
+		var chunk: Chunk = active_chunk_set.get(key)
+		active_chunk_set.erase(key)
+		chunk.state = Chunk.chunk_state.RETIRING
+		retiring_chunk_set.set(key, chunk)
+
+## Look through retiring chunks and see if their space is filled by ACTIVE chunks. If so, move to ready_to_die_chunks
+func check_retiring_chunks() -> void:
+	# Keep track of chunks that will need to be removed
+	var chunks_to_remove: Array = []
+	# For each retiring chunk, see if it's inside an active chunk or if it contains 8 active chunks. If so, add to chunks_to_remove
+	for key in retiring_chunk_set.keys():
+		var should_continue := false # Used to keep track of if a merge condition was met
+		var candidate_chunks: Array[Chunk] = [] # Stores chunks that are inside the retiree chunk
+
+		# retiree variables
+		var retiree: Chunk = retiring_chunk_set.get(key)
+		var retiree_axis_size: int = key[1] * chunk_size # key[1] = lod_step
+		var retiree_axis_size_vector := Vector3(retiree_axis_size, retiree_axis_size, retiree_axis_size)
+		var retiree_min := retiree.position
+		var retiree_max := retiree.position + retiree_axis_size_vector
+
+		for candidate: Chunk in active_chunk_set.values():
+			# Candidate variables
+			var candidate_axis_size := candidate.lod_step * chunk_size
+			var candidate_axis_vector := Vector3(candidate_axis_size, candidate_axis_size, candidate_axis_size)
+			var candidate_min := candidate.position
+			var candidate_max := candidate.position + candidate_axis_vector
+
+			# bools if retiree is/isn't inside the candidate per axis
+			var retiree_x_is_in_candidate := retiree_min.x >= candidate_min.x and retiree_max.x <= candidate_max.x
+			var retiree_y_is_in_candidate := retiree_min.y >= candidate_min.y and retiree_max.y <= candidate_max.y
+			var retiree_z_is_in_candidate := retiree_min.z >= candidate_min.z and retiree_max.z <= candidate_max.z
+
+			# Check merge condition. If it's inside an ACTIVE candidate, then the retiree can be killed
+			var retiree_is_in_candidate := retiree_x_is_in_candidate and retiree_y_is_in_candidate and retiree_z_is_in_candidate
+			if retiree_is_in_candidate:
+				should_continue = true
+				ready_to_die_chunk_set.set(key, retiree)
+				chunks_to_remove.append(key)
+				break
+			
+			# bools if candidate is/isn't inside the retiree per axis
+			var candidate_x_is_in_retiree := candidate_min.x >= retiree_min.x and candidate_max.x <= retiree_max.x
+			var candidate_y_is_in_retiree := candidate_min.y >= retiree_min.y and candidate_max.y <= retiree_max.y
+			var candidate_z_is_in_retiree := candidate_min.z >= retiree_min.z and candidate_max.z <= retiree_max.z
+			
+			# Check split condition. If the ACTIVE candidate is inside the retiree, add to candidate_chunks
+			var candidate_is_in_retiree = candidate_x_is_in_retiree and candidate_y_is_in_retiree and candidate_z_is_in_retiree
+			if candidate_is_in_retiree: candidate_chunks.append(candidate)
+		# If the merge condition had been matched, continue to next retiree chunk
+		if should_continue: continue
+		# If 8 ACTIVE candidates were found, add to chunks_to_remove and ready_to_die_chunk_set
+		if candidate_chunks.size() == 8:
+			ready_to_die_chunk_set.set(key, retiree)
+			chunks_to_remove.append(key)
+		
+	# Remove READY_TO_DIE chunks from the retiring_chunk_set
+	for key in chunks_to_remove:
+		retiring_chunk_set.erase(key)
+			
+			
+## Unload chunks in ready_to_die
+func kill_dead_chunks() -> void:
+	for key in ready_to_die_chunk_set.keys():
+		unload_octree_chunk(key)
 
 ## Create a new Chunk node, add it to the tree, then set its mesh generation to be outside the main thread.
 func load_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 	var new_chunk = Chunk.new(chunk_size, noise, chunk_pos, lod_step)
 	self.add_child(new_chunk)
 	new_chunk.position = chunk_pos
-	current_chunk_set.set([chunk_pos, lod_step], new_chunk)
+	pending_chunk_set.set([chunk_pos, lod_step], new_chunk)
 	
 	# use threads to generate mesh data
 	var task_id = WorkerThreadPool.add_task(new_chunk.generate_mesh_data)
 	pending_tasks.set(task_id, new_chunk)
 
 ## Ensure a Chunks pending thread task is completed, then remove the chunk from the scene and the leaf set. Remove the task id from pending tasks as well.
-func unload_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
-	var chunk_to_unload: Chunk = current_chunk_set.get([chunk_pos, lod_step])
+func unload_octree_chunk(key: Array) -> void:
+	var chunk_to_unload: Chunk = ready_to_die_chunk_set.get(key)
 	
 	# ensure thread task is complete before removing the chunk
 	var task_id = pending_tasks.find_key(chunk_to_unload)
@@ -146,7 +235,7 @@ func unload_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 		pending_tasks.erase(task_id)
 		
 	# remove chunk from leaf set and remove Chunk from scene tree if possible.
-	current_chunk_set.erase([chunk_pos, lod_step])
+	ready_to_die_chunk_set.erase(key)
 	if chunk_to_unload:
 		var mesh_instance = chunk_to_unload.find_child("ChunkMesh", true, false)
 		#print(chunk_to_unload.get_children(true))
