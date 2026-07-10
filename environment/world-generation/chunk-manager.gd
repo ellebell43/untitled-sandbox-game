@@ -10,16 +10,14 @@ var noise: WorldNoise
 ## Reference to the player node
 var player: Player
 
+var verbose := false
+
 # ========== CHUNK MANAGEMENT VARIABLES ==========
 
 ## Stores all marching cube tasks waiting to be completed off the main thread. int is the task ID, Chunk is the actual Chunk node waiting on the task
 var pending_tasks: Dictionary[int, Chunk] = {}
-## Tracks total tasks completed and stops increasing after a set number of tasks (defined in the moment, further down)
-var total_tasks_completed := 0
-## Maximum "task completed" signals to emit.
-var max_signals_emitted := 1000
-## When true, total_tasks_completed will no longer be tracked. Every time a task completes a signal is emitted. For use in a loading screen.
-var final_signal_emitted := false
+var total_first_tasks: int
+var tasks_emitted := 0
 ## How eagerly chunks split into finer chunks. The higher the number, the greater the distance gate to determine how fine the chunk is. 
 var distance_factor := 1.5
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
@@ -53,34 +51,53 @@ func _ready() -> void:
 	if Utils.verbose: print("Chunk manager ready. Total chunk count: ", int(pow(chunk_count, 3)))
 
 func _process(_delta: float) -> void:
+	var start_time = Time.get_ticks_usec()
 	# If a player position hasn't been recorded yet, iterate through the octree for the first time, compare leaf sets (loads new_chunk_set into current_chunk_set to load chunks in), and record player position
+	var iterate_time: int
 	if not first_iteration_complete:
 		octree_iterate()
 		load_new_chunks()
+		total_first_tasks = pending_tasks.size()
+		if player.spawn_world == self.get_parent():
+			Utils.emit_signal("chunk_task_count_found", total_first_tasks)
 		prev_player_pos = player.position
 		first_iteration_complete = true
+		iterate_time = Time.get_ticks_usec() - start_time
+		if verbose: print("octree iteration time: ", iterate_time)
 	# When the player passes the movement threshold, store the new position, clear the new leaf set, re-iterate through the octree, and compare leaf sets to update chunks
 	if player.position.distance_to(prev_player_pos) >= player_movement_threshold:
 		prev_player_pos = player.position
 		new_chunk_set.clear()
 		octree_iterate()
 		load_new_chunks()
+		iterate_time = Time.get_ticks_usec() - start_time
+		if verbose: print("octree iteration time: ", iterate_time)
+
 	
 	# unload_old_chunks()
 	mark_retiring_chunks()
+	var retirees_set_time: int
+	if iterate_time: retirees_set_time = Time.get_ticks_usec() - start_time - iterate_time
+	else: retirees_set_time = Time.get_ticks_usec() - start_time
+	if verbose: print("retirees mark time: ", retirees_set_time)
 	check_retiring_chunks()
+	var check_retired_time = Time.get_ticks_usec() - retirees_set_time - start_time
+	if verbose: print("retiree check time: ", check_retired_time)
 	kill_dead_chunks()
+	var chunks_killed_time = Time.get_ticks_usec() - check_retired_time - start_time
+	if verbose: print("chunks killed time: ", chunks_killed_time)
 
-	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) and add a maximum of 10 meshes to the scene tree per frame
-	const MAXIMUM_TASK_COMPLETIONS = 20
-	var tasks_completed = 0
+	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) but stop after 3ms
+	const MAXIMUM_BUILD_TIME = 3000 # time in microseconds
+	var current_build_time = 0 
 	var pending_keys = pending_tasks.keys()
 
 	for id in pending_keys:
-		if tasks_completed >= MAXIMUM_TASK_COMPLETIONS:
+		if current_build_time >= MAXIMUM_BUILD_TIME:
 			break
 
 		if WorkerThreadPool.is_task_completed(id):
+			var thread_start_time = Time.get_ticks_usec()
 			WorkerThreadPool.wait_for_task_completion(id)
 			
 			var chunk: Chunk = pending_tasks.get(id)
@@ -92,15 +109,13 @@ func _process(_delta: float) -> void:
 				active_chunk_set.set(key, chunk)
 				pending_chunk_set.erase(key)
 
-			tasks_completed += 1
-			# If we haven't emitted to max_signals_emitted, increment total_tasks completed and emit chunk_task_completed
-			if not final_signal_emitted:
-				total_tasks_completed += 1
-				Utils.chunk_task_completed.emit(total_tasks_completed)
-				if total_tasks_completed >= max_signals_emitted: final_signal_emitted = true
-
 			# Remove the task from the set of pending tasks once it's finished
 			pending_tasks.erase(id)
+			current_build_time += Time.get_ticks_usec() - thread_start_time
+			if tasks_emitted < total_first_tasks and player.spawn_world == self.get_parent():
+				tasks_emitted += 1
+				Utils.emit_signal("chunk_task_completed", tasks_emitted)
+	if verbose: print("mesh build time: ", current_build_time)
 
 ## Iterate through the octree, starting at the root node, and determine what chunks need to be split until depth reaches max_octree_depth. Add chunks to new_chunk_set to be compared against current_chunk_set later
 func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void:
@@ -188,6 +203,7 @@ func check_retiring_chunks() -> void:
 		retiring_chunk_set.erase(key)
 
 func split_test(lod_step: int, parent_pos: Vector3i) -> bool:
+	if lod_step == 1: return false
 	var cell_size := chunk_size * lod_step
 	# iterate through cells at this octree depth and either continue iterating, or append to new leaf set depending on distance to player
 	# Each cell can be split into 8 cells, then each of those can be split into finer 8 cells depending on distance to player and distance_factor

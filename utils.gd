@@ -2,6 +2,7 @@ extends Node3D
 
 @warning_ignore("unused_signal")
 signal chunk_task_completed(tasks_completed: int)
+signal chunk_task_count_found(total_tasks: int)
 
 var verbose := true
 
