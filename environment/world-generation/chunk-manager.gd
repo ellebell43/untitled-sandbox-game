@@ -158,59 +158,49 @@ func check_retiring_chunks() -> void:
 	var chunks_to_remove: Array = []
 	# For each retiring chunk, see if it's inside an active chunk or if it contains 8 active chunks. If so, add to chunks_to_remove
 	for key in retiring_chunk_set.keys():
-		var should_continue := false # Used to keep track of if a merge condition was met
-		var candidate_chunks: Array[Chunk] = [] # Stores chunks that are inside the retiree chunk
-
 		# retiree variables
 		var retiree: Chunk = retiring_chunk_set.get(key)
-		var retiree_axis_size: int = key[1] * chunk_size # key[1] = lod_step
-		var retiree_axis_size_vector := Vector3(retiree_axis_size, retiree_axis_size, retiree_axis_size)
-		var retiree_min := retiree.position
-		var retiree_max := retiree.position + retiree_axis_size_vector
 
-		for candidate: Chunk in active_chunk_set.values():
-			# Candidate variables
-			var candidate_axis_size := candidate.lod_step * chunk_size
-			var candidate_axis_vector := Vector3(candidate_axis_size, candidate_axis_size, candidate_axis_size)
-			var candidate_min := candidate.position
-			var candidate_max := candidate.position + candidate_axis_vector
+		var parent_key: Array # [pos: Vector3i, lod_step: int]
 
-			# bools if retiree is/isn't inside the candidate per axis
-			var retiree_x_is_in_candidate := retiree_min.x >= candidate_min.x and retiree_max.x <= candidate_max.x
-			var retiree_y_is_in_candidate := retiree_min.y >= candidate_min.y and retiree_max.y <= candidate_max.y
-			var retiree_z_is_in_candidate := retiree_min.z >= candidate_min.z and retiree_max.z <= candidate_max.z
+		# Add merge case chunks to keys_to_check calculating parent chunk depth and position
+		var parent_cell_lod_step := retiree.lod_step * 2
+		var parent_cell_size := chunk_size * parent_cell_lod_step
+		var parent_pos_x: int = floor(retiree.position.x / parent_cell_size) * parent_cell_size # using floor() drops the decimal, giving us parent grid space position when we re-multiply by parent_cell_size
+		var parent_pos_y: int = floor(retiree.position.y / parent_cell_size) * parent_cell_size
+		var parent_pos_z: int = floor(retiree.position.z / parent_cell_size) * parent_cell_size
+		parent_key = [Vector3i(parent_pos_x, parent_pos_y, parent_pos_z), parent_cell_lod_step]
 
-			# Check merge condition. If it's inside an ACTIVE candidate, then the retiree can be killed
-			var retiree_is_in_candidate := retiree_x_is_in_candidate and retiree_y_is_in_candidate and retiree_z_is_in_candidate
-			if retiree_is_in_candidate:
-				should_continue = true
-				ready_to_die_chunk_set.set(key, retiree)
-				chunks_to_remove.append(key)
-				break
-			
-			# bools if candidate is/isn't inside the retiree per axis
-			var candidate_x_is_in_retiree := candidate_min.x >= retiree_min.x and candidate_max.x <= retiree_max.x
-			var candidate_y_is_in_retiree := candidate_min.y >= retiree_min.y and candidate_max.y <= retiree_max.y
-			var candidate_z_is_in_retiree := candidate_min.z >= retiree_min.z and candidate_max.z <= retiree_max.z
-			
-			# Check split condition. If the ACTIVE candidate is inside the retiree, add to candidate_chunks
-			var candidate_is_in_retiree = candidate_x_is_in_retiree and candidate_y_is_in_retiree and candidate_z_is_in_retiree
-			if candidate_is_in_retiree: candidate_chunks.append(candidate)
-		# If the merge condition had been matched, continue to next retiree chunk
-		if should_continue: continue
-
-		# See if candidates fill the space of the retiree. If so, the retiree can be added to READY_TO_DIE chunk set.
-		var total_candidate_space := 0
-		for chunk in candidate_chunks:
-			total_candidate_space += chunk.lod_step * chunk.lod_step * chunk.lod_step
-		if total_candidate_space >= retiree.lod_step * retiree.lod_step * retiree.lod_step:
+		# If the parent is active, the retiree can be killed
+		if active_chunk_set.has(parent_key):
 			ready_to_die_chunk_set.set(key, retiree)
 			chunks_to_remove.append(key)
+			continue
 		
-	# Remove READY_TO_DIE chunks from the retiring_chunk_set
+		if retiree.lod_step == 1: continue
+		@warning_ignore("integer_division")
+		if split_test(retiree.lod_step / 2, retiree.position) == true:
+			ready_to_die_chunk_set.set(key, retiree)
+			chunks_to_remove.append(key)
+			continue
+	
 	for key in chunks_to_remove:
 		retiring_chunk_set.erase(key)
-			
+
+func split_test(lod_step: int, parent_pos: Vector3i) -> bool:
+	var cell_size := chunk_size * lod_step
+	# iterate through cells at this octree depth and either continue iterating, or append to new leaf set depending on distance to player
+	# Each cell can be split into 8 cells, then each of those can be split into finer 8 cells depending on distance to player and distance_factor
+	for _x in 2:
+		for _y in 2:
+			for _z in 2:
+				var cell_pos = parent_pos + Vector3i(_x, _y, _z) * cell_size
+				if lod_step > 1 and not active_chunk_set.has([cell_pos, lod_step]):
+					@warning_ignore("integer_division")
+					split_test(lod_step / 2, cell_pos)
+				elif lod_step == 1 and not active_chunk_set.has([cell_pos, lod_step]):
+					return false
+	return true
 			
 ## Unload chunks in ready_to_die
 func kill_dead_chunks() -> void:
