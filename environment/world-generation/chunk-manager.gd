@@ -198,8 +198,12 @@ func check_retiring_chunks() -> void:
 			if candidate_is_in_retiree: candidate_chunks.append(candidate)
 		# If the merge condition had been matched, continue to next retiree chunk
 		if should_continue: continue
-		# If 8 ACTIVE candidates were found, add to chunks_to_remove and ready_to_die_chunk_set
-		if candidate_chunks.size() == 8:
+
+		# See if candidates fill the space of the retiree. If so, the retiree can be added to READY_TO_DIE chunk set.
+		var total_candidate_space := 0
+		for chunk in candidate_chunks:
+			total_candidate_space += chunk.lod_step * chunk.lod_step * chunk.lod_step
+		if total_candidate_space >= retiree.lod_step * retiree.lod_step * retiree.lod_step:
 			ready_to_die_chunk_set.set(key, retiree)
 			chunks_to_remove.append(key)
 		
