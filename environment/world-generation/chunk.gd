@@ -20,7 +20,14 @@ var lod_step: int
 ## The data for the mesh of this chunk. Generated in _generate_mesh_data
 var mesh_data: ArrayMesh
 ## Is either PROCESSING, ACTIVE, or PENDING and is used to ensure that other chunks are loaded in before this chunk free itself to prevent LOD "popping"
-var state := chunk_state.PROCESSING
+var state := chunk_state.PROCESSING:
+	set(new_state):
+		state = new_state
+		# If state is set to ACTIVE, reset volume counter
+		if new_state == chunk_state.ACTIVE:
+			volume_counter = 0
+## When retiring, ACTIVE chunks will check to see if this chunk is a parent. If so, it will add to the volume counter. Once volume_counter == size * lod_step, then this chunk can be removed.
+var volume_counter := 0
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.size = _size
