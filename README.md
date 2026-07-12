@@ -22,3 +22,7 @@ This game will be free to play with no monetization strategies other than a Ko-F
 ## Development
 
 As I am the only person on this project right now, I will be keeping track of development via GitHub issues. Want to help out? Get in touch with me by opening up a GitHub issue!
+
+## AI Disclaimer
+
+AI is used in this project. However, no AI code is in this project. I use Claude AI as a learning tool. I have it explain concepts, identify optimizations points, and teach me specific concepts I'm not familiar with, and that is it. All code has been created and written out by a human. Any art and music that is added to this project will be made by a human. All contributors to this project are expected to adhere to the same level AI usage (or less). Any code/assets identified to have been made explicitly by AI will be rejected.
