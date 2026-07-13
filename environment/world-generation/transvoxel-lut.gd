@@ -1,3 +1,5 @@
+class_name TransvoxelLUT
+
 #  ==============================================
 # 
 #  Transvoxel Algorithm Data Tables
@@ -49,7 +51,7 @@ const REG_CELL_DATA := [
 	[0x95, [0, 4, 5, 0, 3, 4, 0, 1, 3, 1, 2, 3, 6, 7, 8]]
 ]
 
-const REG_VETEX_DATA := [
+const REG_VERTEX_DATA := [
 	[],
 	[0x6201, 0x5102, 0x3304],
 	[0x6201, 0x2315, 0x4113],
