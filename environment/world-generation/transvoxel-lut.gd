@@ -13,22 +13,13 @@ class_name TransvoxelLUT
 # 
 #  ==============================================
 
-## The CellData structure holds information about the triangulation used for a single equivalence class in the modified Marching Cubes algorithm, described in Section 3.2 and 4.3. This is the combination of the RegularCellData struct and TransitionCellData struct from the original .cpp file from [github](https://github.com/EricLengyel/Transvoxel/blob/main/Transvoxel.cpp)
-class CellData:
-	## High nibble is vertex count, low nibble is triangle count.
-	var geometryCounts: int
-	## Groups of 3 indexes giving the triangulation. Total of 15 indexes for regular cells and 36 for transition cells.
-	var vertexIndex: Array[int]
+# Due to Godot Array type constraints, the cellData struct object has been dropped entirely in favor of static functions
 
-	func _init(_geometryCounts: int, _vertexIndex: Array[int]) -> void:
-		self.geometryCounts = _geometryCounts
-		self.vertexIndex = _vertexIndex
+static func get_vertex_count(geometryCount: int) -> int:
+	return geometryCount >> 4
 	
-	func getVertexCount() -> int:
-		return geometryCounts >> 4
-	
-	func getTriangleCount() -> int:
-		return geometryCounts & 0x0F
+static func get_triangle_count(geometryCount: int) -> int:
+	return geometryCount & 0x0F
 
 ## The regularCellClass table maps an 8-bit regular Marching Cubes case index to an equivalence class index. Even though there are 18 equivalence classes in our modified Marching Cubes algorithm, a couple of them use the same exact triangulations, just with different vertex locations. We combined those classes for this table so that the class index ranges from 0 to 15.
 const REG_CELL_CLASS := [
@@ -50,7 +41,7 @@ const REG_CELL_CLASS := [
 	0x03, 0x04, 0x04, 0x03, 0x04, 0x03, 0x0D, 0x01, 0x04, 0x0D, 0x03, 0x01, 0x03, 0x01, 0x01, 0x00
 ]
 
-## The regularCellData table holds the triangulation data for all 16 distinct classes to which a case can be mapped by the regularCellClass table.
+## The regularCellData table holds the triangulation data for all 16 distinct classes to which a case can be mapped by the regularCellClass table. Note: [0] = geometryCounts; high nibble = vertex count, low nibble = triangle count. [1] = triangulation data
 const REG_CELL_DATA := [
 	[0x00, []],
 	[0x31, [0, 1, 2]],
