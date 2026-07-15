@@ -28,6 +28,12 @@ var state := chunk_state.PROCESSING:
 			volume_counter = 0
 ## When retiring, ACTIVE chunks will check to see if this chunk is a parent. If so, it will add to the volume counter. Once volume_counter == size * lod_step, then this chunk can be removed.
 var volume_counter := 0
+## A 6-bit value defining what faces need to implment transition cells to fix seams between chunks of different resolutions
+var desired_transition_mask := -1
+## A 6-bit value defining the faces that are currently implmenting transition cells
+var built_transition_mask := -1
+## The ID of the worker thread that is constructing the mesh data. When -1, there is no thread and therefor the chunk is not building any mesh data.
+var thread_id := -1
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.size = _size
@@ -58,7 +64,7 @@ func _construct_sample_set() -> PackedFloat32Array:
 		return scalar_samples
 
 ## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assigns the generated data to mesh_vertices and mesh_data
-func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
+func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: int) -> ArrayMesh:
 	#    c6----------------------c7
 	#    / |                     /|
 	#   /  |                    / | 
@@ -157,38 +163,6 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 					mesh_normals.append(normal)
 					
 					i += 3
-				
-				# # determine where mesh vertices go in real space and determine normals for each mesh vertex (uses flat shading on purpose)
-				# var i := 0
-				# while i < triangulation_data.size() and triangulation_data[i] != -1:
-				# 	var edge_a = segment[i]
-				# 	var edge_b = segment[i + 1]
-				# 	var edge_c = segment[i + 2]
-				# 	var vertex_a: Vector3
-				# 	var vertex_b: Vector3
-				# 	var vertex_c: Vector3
-					
-				# 	# determine interpolation ratio
-				# 	var t_a = (isosurface - corner_scalars[EDGE_CORNERS[edge_a][0]]) / (corner_scalars[EDGE_CORNERS[edge_a][1]] - corner_scalars[EDGE_CORNERS[edge_a][0]])
-				# 	var t_b = (isosurface - corner_scalars[EDGE_CORNERS[edge_b][0]]) / (corner_scalars[EDGE_CORNERS[edge_b][1]] - corner_scalars[EDGE_CORNERS[edge_b][0]])
-				# 	var t_c = (isosurface - corner_scalars[EDGE_CORNERS[edge_c][0]]) / (corner_scalars[EDGE_CORNERS[edge_c][1]] - corner_scalars[EDGE_CORNERS[edge_c][0]])
-				# 	# apply interpolation ratio when determining vertex position
-				# 	vertex_a = corner_pos[EDGE_CORNERS[edge_a][0]].lerp(corner_pos[EDGE_CORNERS[edge_a][1]], t_a)
-				# 	vertex_b = corner_pos[EDGE_CORNERS[edge_b][0]].lerp(corner_pos[EDGE_CORNERS[edge_b][1]], t_b)
-				# 	vertex_c = corner_pos[EDGE_CORNERS[edge_c][0]].lerp(corner_pos[EDGE_CORNERS[edge_c][1]], t_c)
-					
-				# 	# append vertices to vertices array
-				# 	mesh_vertices.append(vertex_a)
-				# 	mesh_vertices.append(vertex_c)
-				# 	mesh_vertices.append(vertex_b)
-					
-				# 	# determine normal and append to normals array
-				# 	var normal = (vertex_b - vertex_a).cross(vertex_c - vertex_a)
-				# 	mesh_normals.append(normal)
-				# 	mesh_normals.append(normal)
-				# 	mesh_normals.append(normal)
-					
-				# 	i += 3
 	
 	# package data needed to create the mesh
 	var mesh_indices: PackedInt32Array = []
@@ -206,10 +180,11 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array) -> ArrayMesh:
 	return array_mesh
 
 ## constructs ArrayMesh data for building a MeshInstance3D for this chunk. mesh_data will be null if no data is/should be generated. Should be done off the main game thread.
-func generate_mesh_data() -> void:
+func generate_mesh_data(transition_mask: int) -> void:
 	var scalar_samples = _construct_sample_set()
 	if scalar_samples.size() == 0: mesh_data = null; return
-	mesh_data = _generate_mesh_data(scalar_samples)
+	mesh_data = _generate_mesh_data(scalar_samples, transition_mask)
+	built_transition_mask = transition_mask
 
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it. 
 func build_mesh() -> void:

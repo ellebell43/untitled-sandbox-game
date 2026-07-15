@@ -29,7 +29,7 @@ var max_octree_depth: int
 ## The previously recorder player position. Used to only iterate through the octree when the player moves player_movement_threshold meters
 var prev_player_pos: Vector3
 ## Used to determine when the octree should be iterated through to prevent a per-frame iteration.
-var player_movement_threshold := 10
+var player_movement_threshold := 20
 ## Whether or not the first octree traversal has completed. When true, chunk life-cycle functions are called
 var first_iteration_complete := false
 
@@ -58,41 +58,42 @@ func _ready() -> void:
 # ========== PROCESS FUNCTION ==========
 
 func _process(_delta: float) -> void:
-	var start_time = Time.get_ticks_usec()
 	# If a player position hasn't been recorded yet, iterate through the octree for the first time, compare leaf sets (loads new_chunk_set into current_chunk_set to load chunks in), and record player position
-	var iterate_time: int
+	var start_iterate_time := Time.get_ticks_usec()
 	if not first_iteration_complete:
 		octree_iterate()
+		find_masks()
+		var start_load_time := Time.get_ticks_usec()
 		load_new_chunks()
+		if verbose: print("chunk load time: ", Time.get_ticks_usec() - start_load_time)
 		total_first_tasks = pending_tasks.size()
 		if player.spawn_world == self.get_parent():
 			Utils.emit_signal("chunk_task_count_found", total_first_tasks)
 		prev_player_pos = player.position
 		first_iteration_complete = true
-		iterate_time = Time.get_ticks_usec() - start_time
-		if verbose: print("octree iteration time: ", iterate_time)
+		if verbose: print("octree iterate time: ", Time.get_ticks_usec() - start_iterate_time)
 	# When the player passes the movement threshold, store the new position, clear the new leaf set, re-iterate through the octree, and compare leaf sets to update chunks
 	if player.position.distance_to(prev_player_pos) >= player_movement_threshold:
 		prev_player_pos = player.position
 		new_chunk_set.clear()
 		octree_iterate()
+		find_masks()
+		var start_load_time := Time.get_ticks_usec()
 		load_new_chunks()
-		iterate_time = Time.get_ticks_usec() - start_time
-		if verbose: print("octree iteration time: ", iterate_time)
+		if verbose: print("chunk load time: ", Time.get_ticks_usec() - start_load_time)
+		if verbose: print("octree iterate time: ", Time.get_ticks_usec() - start_iterate_time)
 
 	
 	if first_iteration_complete:
+		var retirees_start_time := Time.get_ticks_usec()
 		mark_retiring_chunks()
-		var retirees_set_time: int
-		if iterate_time: retirees_set_time = Time.get_ticks_usec() - start_time - iterate_time
-		else: retirees_set_time = Time.get_ticks_usec() - start_time
-		if verbose: print("retirees mark time: ", retirees_set_time)
+		if verbose: print("retirees mark time: ", Time.get_ticks_usec() - retirees_start_time)
+		var check_retirees_start_time := Time.get_ticks_usec()
 		check_retiring_chunks()
-		var check_retired_time = Time.get_ticks_usec() - retirees_set_time - start_time
-		if verbose: print("retiree check time: ", check_retired_time)
+		if verbose: print("retirees checked time: ", Time.get_ticks_usec() - check_retirees_start_time)
+		var kill_chunks_start_time := Time.get_ticks_usec()
 		kill_dead_chunks()
-		var chunks_killed_time = Time.get_ticks_usec() - check_retired_time - start_time
-		if verbose: print("chunks killed time: ", chunks_killed_time)
+		if verbose: print("chunks killed time: ", Time.get_ticks_usec() - kill_chunks_start_time)
 
 	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) but stop after 3ms
 	const MAXIMUM_BUILD_TIME = 3000 # time in microseconds
@@ -103,23 +104,32 @@ func _process(_delta: float) -> void:
 		if current_build_time >= MAXIMUM_BUILD_TIME:
 			break
 
+		# Once a thread in pending_taks is done, remove the thread reference from the chunk and build it's mesh
 		if WorkerThreadPool.is_task_completed(id):
+			var chunk: Chunk = pending_tasks.get(id)
+			
+			if pending_chunk_set.size() > 0 and chunk.state != Chunk.chunk_state.PROCESSING:
+				continue
+
 			var thread_start_time = Time.get_ticks_usec()
 			WorkerThreadPool.wait_for_task_completion(id)
 			
-			var chunk: Chunk = pending_tasks.get(id)
 			
 			if chunk != null:
-				chunk.state = Chunk.chunk_state.ACTIVE
-				var key = [Vector3i(chunk.position), chunk.lod_step]
+				chunk.thread_id = -1
 				if chunk.mesh_data != null: chunk.build_mesh()
-				active_chunk_set.set(key, chunk)
-				pending_chunk_set.erase(key)
-				# If first_iteration_complete, then search for a retiring parent. If found, add to retiree's volume counter (done in iterate_through_parents)
-				if first_iteration_complete:
-					var chunk_axis_volume := chunk.size * chunk.lod_step
-					var chunk_volume_to_add := chunk_axis_volume * chunk_axis_volume * chunk_axis_volume
-					iterate_through_parents(chunk_volume_to_add, chunk)
+			
+				# if the chunk comes from pending chunks, move it to active and add it's volume to it's retiring ancestor (if applicable)
+				if chunk.state == Chunk.chunk_state.PROCESSING:
+						chunk.state = Chunk.chunk_state.ACTIVE
+						var key = [Vector3i(chunk.position), chunk.lod_step]
+						active_chunk_set.set(key, chunk)
+						pending_chunk_set.erase(key)
+						# If first_iteration_complete, then search for a retiring parent. If found, add to retiree's volume counter (done in iterate_through_parents).
+						if first_iteration_complete:
+							var chunk_axis_volume := chunk.size * chunk.lod_step
+							var chunk_volume_to_add := chunk_axis_volume * chunk_axis_volume * chunk_axis_volume
+							iterate_through_parents(chunk_volume_to_add, chunk)
 
 			# Remove the task from the set of pending tasks once it's finished
 			pending_tasks.erase(id)
@@ -144,12 +154,45 @@ func octree_iterate(depth: int = 0, parent_pos: Vector3i = Vector3.ZERO) -> void
 				var cell_pos = Vector3(parent_pos) + Vector3(cell_size * _x, cell_size * _y, cell_size * _z)
 				var player_pos := to_local(player.global_position)
 				var player_pos_clamped := player_pos.clamp(cell_pos, Vector3(cell_size, cell_size, cell_size) + cell_pos)
-				if player_pos_clamped.distance_to(to_local(player.global_position)) < cell_size * distance_factor and depth < max_octree_depth:
+				if player_pos_clamped.distance_to(player_pos) < cell_size * distance_factor and depth < max_octree_depth:
 					octree_iterate(depth + 1, cell_pos)
 				else:
 					@warning_ignore("integer_division")
 					var lod_step := cell_size / chunk_size
 					new_chunk_set.set([Vector3i(cell_pos), lod_step], 0)
+
+## Iterates through new_chunk_set and gives each key a 6-bit value. These are applied to pending and active chunks in reconcile_masks()
+func find_masks() -> void:
+	for key in new_chunk_set.keys(): # key: [pos: Vector3i, lod_step: int]
+		# mask is a 6-bit value. Each bit represents if a face should have transition cells or not (1 for yes, 0 for no). 
+		# mask bits: x, y, z, -x, -y, -z
+		var mask := 0
+		var x_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(1, 0, 0))
+		var x_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(-1, 0, 0))
+		var y_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 1, 0))
+		var y_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(0, -1, 0))
+		var z_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, 1))
+		var z_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, -1))
+
+		if x_positive: mask |= (1 << 0)
+		if y_positive: mask |= (1 << 1)
+		if z_positive: mask |= (1 << 2)
+		if x_negative: mask |= (1 << 3)
+		if y_negative: mask |= (1 << 4)
+		if z_negative: mask |= (1 << 5)
+
+		new_chunk_set.set(key, mask)
+
+func does_face_need_transition_cells(pos: Vector3i, lod_step: int, direction: Vector3i) -> bool:
+	var chunk_length := lod_step * chunk_size
+	var chunk_length_vector := Vector3i(chunk_length, chunk_length, chunk_length)
+	var neighbor_pos := pos + chunk_length_vector * direction
+	# if neighbor in given direction is same size, return false
+	if new_chunk_set.has([neighbor_pos, lod_step]): return false
+	# if neighbors parent exists, then this face needs transition cells. Return true
+	var neighbor_parent_key := get_parent_key(null, [neighbor_pos, lod_step])
+	if new_chunk_set.has(neighbor_parent_key): return true
+	return false
 
 ## Compare new_chunk_set vs pending_chunk_set and active_chunk_set to determine chunks to load and then load them
 func load_new_chunks() -> void:
@@ -159,6 +202,7 @@ func load_new_chunks() -> void:
 		if ready_to_die_chunk_set.has(key):
 			active_chunk_set.set(key, ready_to_die_chunk_set[key])
 			var chunk: Chunk = active_chunk_set.get(key)
+			chunk.desired_transition_mask = new_chunk_set.get(key)
 			chunk.state = Chunk.chunk_state.ACTIVE
 			var chunk_volume_axis = chunk.size * chunk.lod_step
 			var chunk_volume = chunk_volume_axis * chunk_volume_axis * chunk_volume_axis
@@ -167,13 +211,28 @@ func load_new_chunks() -> void:
 		elif retiring_chunk_set.has(key):
 			active_chunk_set.set(key, retiring_chunk_set[key])
 			var chunk: Chunk = active_chunk_set.get(key)
+			chunk.desired_transition_mask = new_chunk_set.get(key)
 			chunk.state = Chunk.chunk_state.ACTIVE
 			var chunk_volume_axis = chunk.size * chunk.lod_step
 			var chunk_volume = chunk_volume_axis * chunk_volume_axis * chunk_volume_axis
 			iterate_through_parents(chunk_volume, chunk, [], true)
 			retiring_chunk_set.erase(key)
-		# Otherwise, if the chunk isn't ACTIVE or PENDING, load it.
-		elif not pending_chunk_set.has(key) and not active_chunk_set.has(key):
+		# if key is in active chunk, reconcile a potentially new transition mask and relaod it's mesh if it's needed and the chunk is not already working
+		elif active_chunk_set.has(key):
+			var chunk: Chunk = active_chunk_set.get(key)
+			chunk.desired_transition_mask = new_chunk_set.get(key)
+			if chunk.desired_transition_mask != chunk.built_transition_mask and chunk.thread_id == -1:
+				# use threads to generate mesh data
+				var action = Callable(chunk, "generate_mesh_data")
+				var task_id = WorkerThreadPool.add_task(action.bind(new_chunk_set.get(key)))
+				chunk.thread_id = task_id
+				pending_tasks.set(task_id, chunk)
+		# if new chunk is in pending_chunk_set, update it's transition key, but do not regenerate it as it all pening chunks are working
+		elif pending_chunk_set.has(key):
+			var chunk: Chunk = pending_chunk_set.get(key)
+			chunk.desired_transition_mask = new_chunk_set.get(key)
+		# Otherwise, load the chunk for the first time
+		else:
 			load_octree_chunk(key[0], key[1])
 
 ## Compare active_chunk_set with new_chunk_set and move chunks from active to retiring.
@@ -271,12 +330,17 @@ func kill_dead_chunks() -> void:
 ## Create a new Chunk node, add it to the tree, then set its mesh generation to be outside the main thread.
 func load_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 	var new_chunk = Chunk.new(chunk_size, noise, chunk_pos, lod_step)
+	var chunk_key = [chunk_pos, lod_step]
+	new_chunk.desired_transition_mask = new_chunk_set.get(chunk_key)
 	self.add_child(new_chunk)
 	new_chunk.position = chunk_pos
-	pending_chunk_set.set([chunk_pos, lod_step], new_chunk)
+
+	pending_chunk_set.set(chunk_key, new_chunk)
 	
 	# use threads to generate mesh data
-	var task_id = WorkerThreadPool.add_task(new_chunk.generate_mesh_data)
+	var action = Callable(new_chunk, "generate_mesh_data")
+	var task_id = WorkerThreadPool.add_task(action.bind(new_chunk_set.get(chunk_key)))
+	new_chunk.thread_id = task_id
 	pending_tasks.set(task_id, new_chunk)
 
 ## Ensure a Chunks pending thread task is completed, then remove the chunk from the scene and the leaf set. Remove the task id from pending tasks as well.
@@ -284,10 +348,12 @@ func unload_octree_chunk(key: Array) -> void:
 	var chunk_to_unload: Chunk = ready_to_die_chunk_set.get(key)
 	
 	# ensure thread task is complete before removing the chunk
-	var task_id = pending_tasks.find_key(chunk_to_unload)
-	if task_id != null:
+	var task_id = chunk_to_unload.thread_id
+	if pending_tasks.get(task_id) and WorkerThreadPool.is_task_completed(task_id):
 		WorkerThreadPool.wait_for_task_completion(task_id)
 		pending_tasks.erase(task_id)
+	
+	if pending_tasks.get(task_id) and not WorkerThreadPool.is_task_completed(task_id): return
 		
 	# remove chunk from leaf set and remove Chunk from scene tree if possible.
 	ready_to_die_chunk_set.erase(key)
