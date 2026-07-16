@@ -46,6 +46,36 @@ func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.y_stride = size + 1
 	self.x_stride = (size + 1) * (size + 1)
 
+func _determine_if_cell_is_empty() -> bool:
+	var axis_length := size * lod_step
+	var opposite_corner := offset + Vector3(axis_length, axis_length, axis_length)
+	var minimum_distance: float = scalar.center.clamp(offset, opposite_corner).distance_to(scalar.center)
+	var min_bias: float = scalar.get_bias_from_distance(minimum_distance)
+	if min_bias > scalar.BIAS_THRESHOLD: mesh_data = null; return true
+
+	var max_x: float = abs(offset.x - scalar.center.x)
+	var min_x: float = abs((offset.x + (size) * lod_step) - scalar.center.x)
+	var xm: float
+	if max_x > min_x: xm = max_x
+	else: xm = min_x
+
+	var max_y: float = abs(offset.y - scalar.center.y)
+	var min_y: float = abs((offset.y + (size) * lod_step) - scalar.center.y)
+	var ym: float
+	if max_y > min_y: ym = max_y
+	else: ym = min_y
+
+	var max_z: float = abs(offset.z - scalar.center.z)
+	var min_z: float = abs((offset.z + (size) * lod_step) - scalar.center.z)
+	var zm: float
+	if max_z > min_z: zm = max_z
+	else: zm = min_z
+
+	var max_bias := scalar.get_bias_from_distance(sqrt(xm * xm + ym * ym + zm * zm))
+	if max_bias < -scalar.BIAS_THRESHOLD: mesh_data = null; return true
+
+	return false
+
 ## Returns either an array of scalar values to use in generating mesh data. The array has one copy of all needed scalar values to avoid sampling the same point multiple times. Null is returned when all points are above or below the surface, so no mesh should be generated
 func _construct_sample_set() -> PackedFloat32Array:
 	var scalar_samples: PackedFloat32Array = []
@@ -180,6 +210,7 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 					i += 3
 				
 				vertex_set.clear()
+				built_transition_mask = transition_mask
 	
 	var surface_arrays: Array = []
 	surface_arrays.resize(Mesh.ARRAY_MAX)
@@ -193,12 +224,13 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 
 ## constructs ArrayMesh data for building a MeshInstance3D for this chunk. mesh_data will be null if no data is/should be generated. Should be done off the main game thread.
 func generate_mesh_data(transition_mask: int) -> void:
-	var start_time := Time.get_ticks_usec()
+	if _determine_if_cell_is_empty(): return
+	# var start_time := Time.get_ticks_usec()
 	var scalar_samples := _construct_sample_set()
 	if scalar_samples.size() == 0: mesh_data = null; return
 	mesh_data = _generate_mesh_data(scalar_samples, transition_mask)
 	built_transition_mask = transition_mask
-	print("chunk gen time: ", Time.get_ticks_usec() - start_time)
+	# print("chunk gen time: ", Time.get_ticks_usec() - start_time)
 
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it. 
 func build_mesh() -> void:

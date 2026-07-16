@@ -21,7 +21,7 @@ var total_first_tasks: int
 ## The number of tasks actually completed. Emitted out and used by loading screen to determine 0% to 100%
 var tasks_emitted := 0
 ## How eagerly chunks split into finer chunks. The higher the number, the greater the distance gate to determine how fine the chunk is. 
-var distance_factor := 1
+var distance_factor := 2
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
 var root_node_size: int
 ## The maximum depth that the octree will go to. Same as Planet.size. (20 * 2^size = WorldNoise.size)
