@@ -21,7 +21,7 @@ var total_first_tasks: int
 ## The number of tasks actually completed. Emitted out and used by loading screen to determine 0% to 100%
 var tasks_emitted := 0
 ## How eagerly chunks split into finer chunks. The higher the number, the greater the distance gate to determine how fine the chunk is. 
-var distance_factor := 1.5
+var distance_factor := 1
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
 var root_node_size: int
 ## The maximum depth that the octree will go to. Same as Planet.size. (20 * 2^size = WorldNoise.size)
@@ -29,7 +29,7 @@ var max_octree_depth: int
 ## The previously recorder player position. Used to only iterate through the octree when the player moves player_movement_threshold meters
 var prev_player_pos: Vector3
 ## Used to determine when the octree should be iterated through to prevent a per-frame iteration.
-var player_movement_threshold := 20
+var player_movement_threshold := 10
 ## Whether or not the first octree traversal has completed. When true, chunk life-cycle functions are called
 var first_iteration_complete := false
 
@@ -96,7 +96,7 @@ func _process(_delta: float) -> void:
 		if verbose: print("chunks killed time: ", Time.get_ticks_usec() - kill_chunks_start_time)
 
 	# Iterate through pending tasks (created from current_chunk_set chunks; see load_octree_chunk()) but stop after 3ms
-	const MAXIMUM_BUILD_TIME = 3000 # time in microseconds
+	const MAXIMUM_BUILD_TIME = 4000 # time in microseconds
 	var current_build_time = 0
 	var pending_keys = pending_tasks.keys()
 
@@ -206,7 +206,7 @@ func load_new_chunks() -> void:
 			chunk.state = Chunk.chunk_state.ACTIVE
 			var chunk_volume_axis = chunk.size * chunk.lod_step
 			var chunk_volume = chunk_volume_axis * chunk_volume_axis * chunk_volume_axis
-			iterate_through_parents(chunk_volume, chunk, [], true)
+			iterate_through_parents(chunk_volume, chunk, [], false)
 			ready_to_die_chunk_set.erase(key)
 		elif retiring_chunk_set.has(key):
 			active_chunk_set.set(key, retiring_chunk_set[key])
@@ -215,7 +215,7 @@ func load_new_chunks() -> void:
 			chunk.state = Chunk.chunk_state.ACTIVE
 			var chunk_volume_axis = chunk.size * chunk.lod_step
 			var chunk_volume = chunk_volume_axis * chunk_volume_axis * chunk_volume_axis
-			iterate_through_parents(chunk_volume, chunk, [], true)
+			iterate_through_parents(chunk_volume, chunk, [], false)
 			retiring_chunk_set.erase(key)
 		# if key is in active chunk, reconcile a potentially new transition mask and relaod it's mesh if it's needed and the chunk is not already working
 		elif active_chunk_set.has(key):
@@ -349,11 +349,10 @@ func unload_octree_chunk(key: Array) -> void:
 	
 	# ensure thread task is complete before removing the chunk
 	var task_id = chunk_to_unload.thread_id
-	if pending_tasks.get(task_id) and WorkerThreadPool.is_task_completed(task_id):
+	if task_id != -1 and WorkerThreadPool.is_task_completed(task_id):
 		WorkerThreadPool.wait_for_task_completion(task_id)
 		pending_tasks.erase(task_id)
-	
-	if pending_tasks.get(task_id) and not WorkerThreadPool.is_task_completed(task_id): return
+	elif task_id != -1: return
 		
 	# remove chunk from leaf set and remove Chunk from scene tree if possible.
 	ready_to_die_chunk_set.erase(key)

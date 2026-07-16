@@ -188,14 +188,20 @@ func generate_mesh_data(transition_mask: int) -> void:
 
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it. 
 func build_mesh() -> void:
+	for child in get_children():
+		if child is MeshInstance3D and child.name == "ChunkMesh":
+			child.name = "ChunkMeshOld"
+			child.queue_free()
+			break
+
 	# create the mesh instance, assign the mesh to it, and add it to the scene
 	var mesh_instance = MeshInstance3D.new()
+	self.add_child(mesh_instance)
 	mesh_instance.name = "ChunkMesh"
 	mesh_instance.mesh = mesh_data
-	self.add_child(mesh_instance)
 	
 	if lod_step == 1:
 		mesh_instance.create_trimesh_collision()
-		var collision_instance: StaticBody3D = mesh_instance.get_child(0)
+		var collision_instance: StaticBody3D = mesh_instance.get_child(-1)
 		collision_instance.set_collision_layer_value(2, true) # planet collision layer
 		collision_instance.set_collision_mask_value(1, true) # player collisions
