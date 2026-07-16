@@ -28,33 +28,42 @@ var state := chunk_state.PROCESSING:
 			volume_counter = 0
 ## When retiring, ACTIVE chunks will check to see if this chunk is a parent. If so, it will add to the volume counter. Once volume_counter == size * lod_step, then this chunk can be removed.
 var volume_counter := 0
-## A 6-bit value defining what faces need to implment transition cells to fix seams between chunks of different resolutions
+## A 6-bit value defining what faces need to implement transition cells to fix seams between chunks of different resolutions
 var desired_transition_mask := -1
-## A 6-bit value defining the faces that are currently implmenting transition cells
+## A 6-bit value defining the faces that are currently implementing transition cells
 var built_transition_mask := -1
-## The ID of the worker thread that is constructing the mesh data. When -1, there is no thread and therefor the chunk is not building any mesh data.
+## The ID of the worker thread that is constructing the mesh data. When -1, there is no thread and therefore the chunk is not building any mesh data.
 var thread_id := -1
+
+var y_stride: int
+var x_stride: int
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.size = _size
 	self.scalar = _noise
 	self.offset = _offset
 	self.lod_step = _lod_step
+	self.y_stride = size + 1
+	self.x_stride = (size + 1) * (size + 1)
 
 ## Returns either an array of scalar values to use in generating mesh data. The array has one copy of all needed scalar values to avoid sampling the same point multiple times. Null is returned when all points are above or below the surface, so no mesh should be generated
 func _construct_sample_set() -> PackedFloat32Array:
 	var scalar_samples: PackedFloat32Array = []
+	scalar_samples.resize((size + 1) * (size + 1) * (size + 1))
 	var is_all_above := true
 	var is_all_below := true
 	for x in size + 1:
+		var x_value := x * lod_step + offset.x
 		for y in size + 1:
+			var y_value = y * lod_step + offset.y
 			for z in size + 1:
 				var sample := scalar.sample(
-					x * lod_step + offset.x,
-					y * lod_step + offset.y,
+					x_value,
+					y_value,
 					z * lod_step + offset.z
 				)
-				scalar_samples.append(sample)
+				var index: int = (x * ((size + 1) * (size + 1))) + (y * (size + 1)) + z
+				scalar_samples[index] = sample
 				if sample > isosurface: is_all_below = false
 				if sample < isosurface: is_all_above = false
 	
@@ -81,55 +90,61 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 	var mesh_vertices: PackedVector3Array = []
 	var mesh_normals: PackedVector3Array = []
 	
+	# Initialized arrays and stride values to 
+	var scalar_values: PackedFloat32Array = []
+	scalar_values.resize(8)
+	var cell_corner_set: PackedVector3Array = []
+	cell_corner_set.resize(8)
+	var vertex_set: PackedVector3Array = []
+
 	# Loop through each cube and generate vertices and normals for that cube
 	for x in size: # - 1:
+		var x_scalar_stride_zero := x * x_stride
+		var x_scalar_stride_one := (x + 1) * x_stride
 		for y in size: # - 1:
+			var y_scalar_stride_one := (y + 1) * y_stride
+			var y_scalar_stride_zero := y * y_stride
 			for z in size: # - 1:
-				if !scalar: return
 				# cube corner scalar values
-				var y_stride := size + 1
-				var x_stride := int(pow(size + 1, 2))
-				var c0 = scalar_samples[x * x_stride + y * y_stride + z]
-				var c1 = scalar_samples[(x + 1) * x_stride + y * y_stride + z]
-				var c2 = scalar_samples[x * x_stride + y * y_stride + (z + 1)]
-				var c3 = scalar_samples[(x + 1) * x_stride + y * y_stride + (z + 1)]
-				var c4 = scalar_samples[x * x_stride + (y + 1) * y_stride + z]
-				var c5 = scalar_samples[(x + 1) * x_stride + (y + 1) * y_stride + z]
-				var c6 = scalar_samples[x * x_stride + (y + 1) * y_stride + (z + 1)]
-				var c7 = scalar_samples[(x + 1) * x_stride + (y + 1) * y_stride + (z + 1)]
-				var corner_scalars = [c0, c1, c2, c3, c4, c5, c6, c7]
-				
-				# cube corner positions in space
-				var c0_pos = Vector3(x, y, z) * lod_step
-				var c1_pos = Vector3((x + 1), y, z) * lod_step
-				var c2_pos = Vector3(x, y, (z + 1)) * lod_step
-				var c3_pos = Vector3((x + 1), y, (z + 1)) * lod_step
-				var c4_pos = Vector3(x, (y + 1), z) * lod_step
-				var c5_pos = Vector3((x + 1), (y + 1), z) * lod_step
-				var c6_pos = Vector3(x, (y + 1), (z + 1)) * lod_step
-				var c7_pos = Vector3((x + 1), (y + 1), (z + 1)) * lod_step
-				var corner_pos = [c0_pos, c1_pos, c2_pos, c3_pos, c4_pos, c5_pos, c6_pos, c7_pos]
+				scalar_values[0] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_zero + z]
+				scalar_values[1] = scalar_samples[x_scalar_stride_one + y_scalar_stride_zero + z]
+				scalar_values[2] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_zero + (z + 1)]
+				scalar_values[3] = scalar_samples[x_scalar_stride_one + y_scalar_stride_zero + (z + 1)]
+				scalar_values[4] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_one + z]
+				scalar_values[5] = scalar_samples[x_scalar_stride_one + y_scalar_stride_one + z]
+				scalar_values[6] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_one + (z + 1)]
+				scalar_values[7] = scalar_samples[x_scalar_stride_one + y_scalar_stride_one + (z + 1)]
 				
 				# determine regular class index
-				var class_index = 0
-				if c0 < isosurface: class_index |= (1 << 0)
-				if c1 < isosurface: class_index |= (1 << 1)
-				if c2 < isosurface: class_index |= (1 << 2)
-				if c3 < isosurface: class_index |= (1 << 3)
-				if c4 < isosurface: class_index |= (1 << 4)
-				if c5 < isosurface: class_index |= (1 << 5)
-				if c6 < isosurface: class_index |= (1 << 6)
-				if c7 < isosurface: class_index |= (1 << 7)
+				var class_index := 0
+				if scalar_values[0] < isosurface: class_index |= (1 << 0)
+				if scalar_values[1] < isosurface: class_index |= (1 << 1)
+				if scalar_values[2] < isosurface: class_index |= (1 << 2)
+				if scalar_values[3] < isosurface: class_index |= (1 << 3)
+				if scalar_values[4] < isosurface: class_index |= (1 << 4)
+				if scalar_values[5] < isosurface: class_index |= (1 << 5)
+				if scalar_values[6] < isosurface: class_index |= (1 << 6)
+				if scalar_values[7] < isosurface: class_index |= (1 << 7)
+				
 				# Skip empty cells
 				if class_index == 0 or class_index == 255:
 					continue
+				
+				# cube corner positions in space
+				cell_corner_set[0] = Vector3(x, y, z) * lod_step
+				cell_corner_set[1] = Vector3((x + 1), y, z) * lod_step
+				cell_corner_set[2] = Vector3(x, y, (z + 1)) * lod_step
+				cell_corner_set[3] = Vector3((x + 1), y, (z + 1)) * lod_step
+				cell_corner_set[4] = Vector3(x, (y + 1), z) * lod_step
+				cell_corner_set[5] = Vector3((x + 1), (y + 1), z) * lod_step
+				cell_corner_set[6] = Vector3(x, (y + 1), (z + 1)) * lod_step
+				cell_corner_set[7] = Vector3((x + 1), (y + 1), (z + 1)) * lod_step
 
 				# use class_index to determine the cell class, construct cell data, and get vertex count
 				var cell_class: int = TransvoxelLUT.REG_CELL_CLASS[class_index]
 				var vertex_count := TransvoxelLUT.get_vertex_count(TransvoxelLUT.REG_CELL_DATA[cell_class][0])
 
 				# Construct a set of vertices to be used for this cell
-				var vertex_set: Array[Vector3] = []
 				for i in vertex_count:
 					var vertex_data: int = TransvoxelLUT.REG_VERTEX_DATA[class_index][i]
 					# Use data in the low byte to construct an edge
@@ -138,8 +153,8 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 					var corner_b := low_byte & 0x0F
 
 					# determine interpolation ratio
-					var interpolation_ratio: float = (isosurface - corner_scalars[corner_a]) / (corner_scalars[corner_b] - corner_scalars[corner_a])
-					var vertex: Vector3 = corner_pos[corner_a].lerp(corner_pos[corner_b], interpolation_ratio)
+					var interpolation_ratio: float = (isosurface - scalar_values[corner_a]) / (scalar_values[corner_b] - scalar_values[corner_a])
+					var vertex: Vector3 = cell_corner_set[corner_a].lerp(cell_corner_set[corner_b], interpolation_ratio)
 
 					vertex_set.append(vertex)
 				
@@ -147,9 +162,9 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 				var vertex_indices = TransvoxelLUT.REG_CELL_DATA[cell_class][1]
 				var i := 0
 				while i < vertex_indices.size():
-					var vertex_a = vertex_set[vertex_indices[i]]
-					var vertex_b = vertex_set[vertex_indices[i + 1]]
-					var vertex_c = vertex_set[vertex_indices[i + 2]]
+					var vertex_a := vertex_set[vertex_indices[i]]
+					var vertex_b := vertex_set[vertex_indices[i + 1]]
+					var vertex_c := vertex_set[vertex_indices[i + 2]]
 
 					# append vertices to vertices array
 					mesh_vertices.append(vertex_a)
@@ -157,21 +172,18 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 					mesh_vertices.append(vertex_c)
 					
 					# determine normal and append to normals array
-					var normal = - (vertex_b - vertex_a).cross(vertex_c - vertex_a)
+					var normal := - (vertex_b - vertex_a).cross(vertex_c - vertex_a).normalized()
 					mesh_normals.append(normal)
 					mesh_normals.append(normal)
 					mesh_normals.append(normal)
 					
 					i += 3
+				
+				vertex_set.clear()
 	
-	# package data needed to create the mesh
-	var mesh_indices: PackedInt32Array = []
-	for i in range(mesh_vertices.size()):
-		mesh_indices.append(i)
-	var surface_arrays = []
+	var surface_arrays: Array = []
 	surface_arrays.resize(Mesh.ARRAY_MAX)
 	surface_arrays[Mesh.ARRAY_VERTEX] = mesh_vertices
-	surface_arrays[Mesh.ARRAY_INDEX] = mesh_indices
 	surface_arrays[Mesh.ARRAY_NORMAL] = mesh_normals
 	
 	# create the mesh and assign data to it
@@ -181,10 +193,12 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 
 ## constructs ArrayMesh data for building a MeshInstance3D for this chunk. mesh_data will be null if no data is/should be generated. Should be done off the main game thread.
 func generate_mesh_data(transition_mask: int) -> void:
-	var scalar_samples = _construct_sample_set()
+	var start_time := Time.get_ticks_usec()
+	var scalar_samples := _construct_sample_set()
 	if scalar_samples.size() == 0: mesh_data = null; return
 	mesh_data = _generate_mesh_data(scalar_samples, transition_mask)
 	built_transition_mask = transition_mask
+	print("chunk gen time: ", Time.get_ticks_usec() - start_time)
 
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it. 
 func build_mesh() -> void:
@@ -195,7 +209,7 @@ func build_mesh() -> void:
 			break
 
 	# create the mesh instance, assign the mesh to it, and add it to the scene
-	var mesh_instance = MeshInstance3D.new()
+	var mesh_instance := MeshInstance3D.new()
 	self.add_child(mesh_instance)
 	mesh_instance.name = "ChunkMesh"
 	mesh_instance.mesh = mesh_data
