@@ -37,6 +37,7 @@ var thread_id := -1
 
 var y_stride: int
 var x_stride: int
+var face_stride: int
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.size = _size
@@ -45,6 +46,7 @@ func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.lod_step = _lod_step
 	self.y_stride = size + 1
 	self.x_stride = (size + 1) * (size + 1)
+	self.face_stride = 2 * size + 1
 
 func _determine_if_cell_is_empty() -> bool:
 	var axis_length := size * lod_step
@@ -76,34 +78,177 @@ func _determine_if_cell_is_empty() -> bool:
 
 	return false
 
-## Returns either an array of scalar values to use in generating mesh data. The array has one copy of all needed scalar values to avoid sampling the same point multiple times. Null is returned when all points are above or below the surface, so no mesh should be generated
-func _construct_sample_set() -> PackedFloat32Array:
-	var scalar_samples: PackedFloat32Array = []
-	scalar_samples.resize((size + 1) * (size + 1) * (size + 1))
+class SampleSetReturnType:
+	var corner_samples: PackedFloat32Array
+	var transition_samples: Array[PackedFloat32Array]
+
+## Returns either an array of scalar values to use in generating mesh data. The array has one copy of all needed scalar values to avoid sampling the same point multiple times. Null is returned when all points are above or below the surface, so no mesh should be generated. Returns Array[corner_samples: PackedFloat32Array, transtion_samples: Array[PackedFloat32Array]]
+func _construct_sample_set(mask: int = 0) -> SampleSetReturnType:
+	# on grid samples used no matter that mask value
+	var corner_samples: PackedFloat32Array = []
+	corner_samples.resize((size + 1) * (size + 1) * (size + 1))
+	# subdivided grid samples. Each array corresponds to a face of the chunk: x,y,z,-x,-y,-z
+	var transition_samples: Array[PackedFloat32Array] = [[], [], [], [], [], []]
+	for i in transition_samples.size():
+		if (mask >> i) & 1 == 1: transition_samples[i].resize(face_stride * face_stride)
+	# used at the end of the function. If all on-grid samples are above or if all are below, then an empty array is returned, signaling that this chunk can be skipped and no mesh is needed
 	var is_all_above := true
 	var is_all_below := true
+
+	# ============ BEGIN ON-GRID SAMPLING ============
+
+	# On each level (x, y, and z), find if a transition face applies and get the actual x,y,z value based on lod_step and offest. Also get the subdivided value of the current x, y, and z
 	for x in size + 1:
 		var x_value := x * lod_step + offset.x
+		var x_negative_transition := x == 0 and (mask >> 3) & 1 == 1
+		var x_positive_transition := x == size and (mask >> 0) & 1 == 1
+		var xi = x * 2
+
 		for y in size + 1:
 			var y_value = y * lod_step + offset.y
+			var y_negative_transition := y == 0 and (mask >> 4) & 1 == 1
+			var y_positive_transition := y == size and (mask >> 1) & 1 == 1
+			var yi = y * 2
+
 			for z in size + 1:
-				var sample := scalar.sample(
+				var z_value = z * lod_step + offset.z
+				var z_negative_transition := z == 0 and (mask >> 5) & 1 == 1
+				var z_positive_transition := z == size and (mask >> 2) & 1 == 1
+				var zi = z * 2
+
+				# Get corner sample and add it to corner samples array. Index is calculated instead of appended since the array is a specific size
+				var corner_sample := scalar.sample(
 					x_value,
 					y_value,
-					z * lod_step + offset.z
+					z_value
 				)
 				var index: int = (x * ((size + 1) * (size + 1))) + (y * (size + 1)) + z
-				scalar_samples[index] = sample
-				if sample > isosurface: is_all_below = false
-				if sample < isosurface: is_all_above = false
+				corner_samples[index] = corner_sample
+
+				# ============ END ON-GRID SAMPLING ============ 
+				# ============ BEGIN TRANSITION FACE SAMPLING ============ 
+				#
+				# TRANSITION FACE POINTS REFERENCE
+				#
+				#  6----------7  ----------8
+				#  |          |            |
+				#  |          |            |
+				#  |          |            |
+				#  |          |            |
+				#
+				#  3----------4  ----------5
+				#  |          |            |
+				#  |          |            |
+				#  |          |            |
+				#  |          |            |
+				#  0----------1  ----------2 
+				#
+				# corners (0, 2, 6, 8) are on grid and can use normal z,y,z positions
+				# 1, 2, 3, 4, and 7 are all transition values and are half steps between full grid positions
+				#
+				# A corner can project out and get half step values for transition faces
+				# i.e. if this cell is on the outter most corner of the face -> 
+				#     0 can get 1, 3, and 4. 
+				#     2 can get 5. 
+				#     8 would get no transition values, as it's the max value from each axis
+				#
+				# CHUNK FACE LABEL REFERENCE
+				#
+				#        o----------------------o
+				#       /|                     /|
+				#      / |       y+           / |
+				#     /  |                   /  | 
+				#    /   |                  /   | 
+				#   o----------------------o    |
+				#   |    |                 |    |
+				#   |    |        z+       | x+ |  
+				#   | x- |                 |    |
+				#   |    |     z-          |    |
+				#   |    o-----------------|----o
+				#   |   /                  |   /
+				#   |  /                   |  /
+				#   | /         y-         | / 
+				#   |/                     |/ 
+				#   o----------------------o
+				#
+				# mask bits represet which face needs transition cells. 
+				# 6 bits: x,y,z,-x,-y,-z. 1 = needs transtion cells, 0 = does not need transition cells
+
+				# get transition samples and add them to their corresponding arrays on a per-transition-face basis
+				if x_negative_transition:
+					_get_transition_samples(transition_samples, 3, Vector3(x_value, y_value, z_value), 2, 1, zi, yi, z, y, corner_sample)
+				if x_positive_transition:
+					_get_transition_samples(transition_samples, 0, Vector3(x_value, y_value, z_value), 1, 2, yi, zi, y, z, corner_sample)
+				if y_negative_transition:
+					_get_transition_samples(transition_samples, 4, Vector3(x_value, y_value, z_value), 2, 0, zi, xi, z, x, corner_sample)
+				if y_positive_transition:
+					_get_transition_samples(transition_samples, 1, Vector3(x_value, y_value, z_value), 0, 2, xi, zi, x, z, corner_sample)
+				if z_negative_transition:
+					_get_transition_samples(transition_samples, 5, Vector3(x_value, y_value, z_value), 0, 1, xi, yi, x, y, corner_sample)
+				if z_positive_transition:
+					_get_transition_samples(transition_samples, 2, Vector3(x_value, y_value, z_value), 1, 0, yi, xi, y, x, corner_sample)
+
+				if corner_sample > isosurface: is_all_below = false
+				if corner_sample < isosurface: is_all_above = false
 	
+				# ============ END TRANSITION FACE SAMPLING ============ 
+	
+	# return an empty array if all on-grid points are above/below the surface. Otherwise, return sample data
 	if is_all_above or is_all_below:
-		return []
+		return null
 	else:
-		return scalar_samples
+		var return_data := SampleSetReturnType.new()
+		return_data.corner_samples = corner_samples
+		return_data.transition_samples = transition_samples
+		return return_data
+
+## Gets and injects transition samples accoriding to given parameters. `transition_samples` is a reference to the 6 nested arrays thatwill contain sample data for each transition face, keyed to the transition mas convention of x,y,z,-x,-y,-z. `child_arr` is the index of one of those 6 nested arrays that the gotten samples will be injected into. `loop_values` is the x, y, and z values used to get a sample at an on-grid position. `u_axis`and `v_axis` are the 2D axes of the transition face and is used to specify which axes to manipulate when determining the s1, s3, and s4 positions; should be either 0, 1, or 2 for x, y, or z. `ui` and `vi` are the origin index values of the current loop position, translated into transition space (*2). `u` and `v` are the values of `x`, `y`, or `z` directly from the loop iteration and are used to conditional inject corner, s1, s3, and s4 samples. `corner_sample` is the origin of the 2D transition cell and is an on-grid sample determined in the primary `for` loops
+func _get_transition_samples(
+		transition_samples: Array[PackedFloat32Array], child_arr: int,
+		loop_values: Vector3,
+		u_axis: int, v_axis: int,
+		ui: int, vi: int,
+		u: int, v: int,
+		corner_sample: float
+	) -> void:
+	var s1_position := loop_values
+	var s3_position := loop_values
+	var s4_position := loop_values
+
+	# Manipulate sample positions based on TRANSITION FACE POINTS REFERENCE
+	s1_position[u_axis] += lod_step / 2.0
+	s3_position[v_axis] += lod_step / 2.0
+	s4_position[u_axis] += lod_step / 2.0
+	s4_position[v_axis] += lod_step / 2.0
+
+	# sample and inject to the correct array depending on where this point is located. 
+	# If u,v are below their axes' maximum, sample/inject all points
+	if u < size and v < size:
+		var s1_sample := scalar.sample(s1_position.x, s1_position.y, s1_position.z)
+		var s3_sample := scalar.sample(s3_position.x, s3_position.y, s3_position.z)
+		var s4_sample := scalar.sample(s4_position.x, s4_position.y, s4_position.z)
+		# add corner + all 3 transition samples to transition face array
+		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, s1_sample, s3_sample, s4_sample)
+	# If only u is below is axis' maximum, sample/inject only s1 and corner_sample
+	elif u < size and not v < size:
+		var s1_sample := scalar.sample(s1_position.x, s1_position.y, s1_position.z)
+		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, s1_sample, null, null)
+	# If only v is below is axis' maximum, sample/inject only s3 and corner_sample
+	elif not u < size and v < size:
+		var s3_sample := scalar.sample(s3_position.x, s3_position.y, s3_position.z)
+		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, null, s3_sample, null)
+	# If both u,v are at their axes' maximum, sample/inject only corner_sample
+	else:
+		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, null, null, null)
+
+func _inject_transition_samples(transition_samples: Array[PackedFloat32Array], child_arr: int, ui: int, vi: int, corner_sample: float, s1 = null, s3 = null, s4 = null) -> void:
+	transition_samples[child_arr][ui * face_stride + vi] = corner_sample
+	if s1 != null: transition_samples[child_arr][(ui + 1) * face_stride + vi] = s1
+	if s3 != null: transition_samples[child_arr][ui * face_stride + (vi + 1)] = s3
+	if s4 != null: transition_samples[child_arr][(ui + 1) * face_stride + (vi + 1)] = s4
 
 ## Uses the scalar property and isosurface property to generate mesh vertices and normals. Assigns the generated data to mesh_vertices and mesh_data
-func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: int) -> ArrayMesh:
+func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: int, transition_samples: Array[PackedFloat32Array]) -> ArrayMesh:
 	#    c6----------------------c7
 	#    / |                     /|
 	#   /  |                    / | 
@@ -136,14 +281,14 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 			var y_scalar_stride_zero := y * y_stride
 			for z in size: # - 1:
 				# cube corner scalar values
-				scalar_values[0] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_zero + z]
-				scalar_values[1] = scalar_samples[x_scalar_stride_one + y_scalar_stride_zero + z]
-				scalar_values[2] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_zero + (z + 1)]
-				scalar_values[3] = scalar_samples[x_scalar_stride_one + y_scalar_stride_zero + (z + 1)]
-				scalar_values[4] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_one + z]
-				scalar_values[5] = scalar_samples[x_scalar_stride_one + y_scalar_stride_one + z]
-				scalar_values[6] = scalar_samples[x_scalar_stride_zero + y_scalar_stride_one + (z + 1)]
-				scalar_values[7] = scalar_samples[x_scalar_stride_one + y_scalar_stride_one + (z + 1)]
+				scalar_values[0] = corner_samples[x_scalar_stride_zero + y_scalar_stride_zero + z]
+				scalar_values[1] = corner_samples[x_scalar_stride_one + y_scalar_stride_zero + z]
+				scalar_values[2] = corner_samples[x_scalar_stride_zero + y_scalar_stride_zero + (z + 1)]
+				scalar_values[3] = corner_samples[x_scalar_stride_one + y_scalar_stride_zero + (z + 1)]
+				scalar_values[4] = corner_samples[x_scalar_stride_zero + y_scalar_stride_one + z]
+				scalar_values[5] = corner_samples[x_scalar_stride_one + y_scalar_stride_one + z]
+				scalar_values[6] = corner_samples[x_scalar_stride_zero + y_scalar_stride_one + (z + 1)]
+				scalar_values[7] = corner_samples[x_scalar_stride_one + y_scalar_stride_one + (z + 1)]
 				
 				# determine regular class index
 				var class_index := 0
@@ -210,7 +355,6 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 					i += 3
 				
 				vertex_set.clear()
-				built_transition_mask = transition_mask
 	
 	var surface_arrays: Array = []
 	surface_arrays.resize(Mesh.ARRAY_MAX)
@@ -224,12 +368,12 @@ func _generate_mesh_data(scalar_samples: PackedFloat32Array, transition_mask: in
 
 ## constructs ArrayMesh data for building a MeshInstance3D for this chunk. mesh_data will be null if no data is/should be generated. Should be done off the main game thread.
 func generate_mesh_data(transition_mask: int) -> void:
+	built_transition_mask = transition_mask
 	if _determine_if_cell_is_empty(): return
 	# var start_time := Time.get_ticks_usec()
-	var scalar_samples := _construct_sample_set()
-	if scalar_samples.size() == 0: mesh_data = null; return
-	mesh_data = _generate_mesh_data(scalar_samples, transition_mask)
-	built_transition_mask = transition_mask
+	var sample_data := _construct_sample_set(transition_mask)
+	if sample_data == null: mesh_data = null; return
+	mesh_data = _generate_mesh_data(sample_data.corner_samples, transition_mask, sample_data.transition_samples)
 	# print("chunk gen time: ", Time.get_ticks_usec() - start_time)
 
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it. 
