@@ -23,6 +23,11 @@ config/icon="res://icon.svg"
 
 Utils="*uid://f0gnvfwlqmwr"
 
+[display]
+
+window/size/mode=2
+window/stretch/mode="canvas_items"
+
 [filesystem]
 
 import/blender/enabled=false

@@ -9,7 +9,7 @@ var _floor: float
 var center: Vector3
 ## How strong fall the bias is towards being inside or outside of the volume relative to _floor
 var floor_bias := .5
-const BIAS_THRESHOLD := 1.2
+const BIAS_THRESHOLD := 1.1
 
 func _init(_seed: int, size: float):
 	_noise.noise_type = FastNoiseLite.TYPE_PERLIN
