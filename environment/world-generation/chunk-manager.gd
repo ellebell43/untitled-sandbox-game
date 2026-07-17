@@ -167,6 +167,8 @@ func find_masks() -> void:
 		# mask is a 6-bit value. Each bit represents if a face should have transition cells or not (1 for yes, 0 for no). 
 		# mask bits: x, y, z, -x, -y, -z
 		var mask := 0
+		if key[1] == 1: new_chunk_set.set(key, mask); return
+
 		var x_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(1, 0, 0))
 		var x_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(-1, 0, 0))
 		var y_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 1, 0))
@@ -188,11 +190,8 @@ func does_face_need_transition_cells(pos: Vector3i, lod_step: int, direction: Ve
 	var chunk_length_vector := Vector3i(chunk_length, chunk_length, chunk_length)
 	var neighbor_pos := pos + chunk_length_vector * direction
 	# if neighbor in given direction is same size, return false
-	if new_chunk_set.has([neighbor_pos, lod_step]): return false
-	# if neighbors parent exists, then this face needs transition cells. Return true
-	var neighbor_parent_key := get_parent_key(null, [neighbor_pos, lod_step])
-	if new_chunk_set.has(neighbor_parent_key): return true
-	return false
+	if new_chunk_set.has([neighbor_pos, lod_step / 2]): return true
+	else: return false
 
 ## Compare new_chunk_set vs pending_chunk_set and active_chunk_set to determine chunks to load and then load them
 func load_new_chunks() -> void:
