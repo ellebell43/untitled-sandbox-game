@@ -167,14 +167,14 @@ func find_masks() -> void:
 		# mask is a 6-bit value. Each bit represents if a face should have transition cells or not (1 for yes, 0 for no). 
 		# mask bits: x, y, z, -x, -y, -z
 		var mask := 0
-		if key[1] == 1: new_chunk_set.set(key, mask); return
+		if key[1] == 1: new_chunk_set.set(key, mask); continue
 
 		var x_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(1, 0, 0))
-		var x_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(-1, 0, 0))
+		var x_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(-1, 0, 0), true)
 		var y_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 1, 0))
-		var y_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(0, -1, 0))
+		var y_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(0, -1, 0), true)
 		var z_positive := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, 1))
-		var z_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, -1))
+		var z_negative := does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, -1), true)
 
 		if x_positive: mask |= (1 << 0)
 		if y_positive: mask |= (1 << 1)
@@ -185,8 +185,9 @@ func find_masks() -> void:
 
 		new_chunk_set.set(key, mask)
 
-func does_face_need_transition_cells(pos: Vector3i, lod_step: int, direction: Vector3i) -> bool:
+func does_face_need_transition_cells(pos: Vector3i, lod_step: int, direction: Vector3i, is_negative := false) -> bool:
 	var chunk_length := lod_step * chunk_size
+	if is_negative: chunk_length /= 2
 	var chunk_length_vector := Vector3i(chunk_length, chunk_length, chunk_length)
 	var neighbor_pos := pos + chunk_length_vector * direction
 	# if neighbor in given direction is same size, return false
@@ -356,11 +357,11 @@ func unload_octree_chunk(key: Array) -> void:
 	# remove chunk from leaf set and remove Chunk from scene tree if possible.
 	ready_to_die_chunk_set.erase(key)
 	if chunk_to_unload:
-		var mesh_instance = chunk_to_unload.find_child("ChunkMesh", true, false)
+		# var mesh_instance = chunk_to_unload.find_child("ChunkMesh", true, false)
 		#print(chunk_to_unload.get_children(true))
-		if mesh_instance:
-			var tween = create_tween()
-			tween.tween_property(mesh_instance, "transparency", 1, 1)
-			tween.tween_callback(chunk_to_unload.queue_free)
-		else:
-			chunk_to_unload.queue_free()
+		# if mesh_instance:
+		# 	var tween = create_tween()
+		# 	tween.tween_property(mesh_instance, "transparency", 1, 1)
+		# 	tween.tween_callback(chunk_to_unload.queue_free)
+		# else:
+		chunk_to_unload.queue_free()
