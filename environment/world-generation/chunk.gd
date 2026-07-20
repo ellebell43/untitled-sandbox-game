@@ -418,6 +418,7 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
 	return array_mesh
 
+## Create the transitional data for cells on the transition face of a chunk
 func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_vertices: PackedVector3Array, actual_vertices: PackedVector3Array, transition_samples: PackedFloat32Array, face_index: int, mesh_vertices: PackedVector3Array, mesh_normals: PackedVector3Array, transition_mask: int):
 	for u in size:
 		for v in size:
@@ -517,6 +518,7 @@ func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_
 			
 			actual_vertices.clear()
 
+## Construct transitional vectors for a cell on a chunks face. `u` and `v` are the two axes of the chunks face that needs the cell and are each either the `x`, `y`, or `z` axis from the chunk. `n` is the the transition vertex index. `face_index` is a 6-bit iteger that represents which chunk faces need transtion cells
 func _construct_transition_vector(u: int, v: int, n: int, face_index: int) -> Vector3:
 	var vector := Vector3()
 	var basis_data := basis_table[face_index]
@@ -525,6 +527,7 @@ func _construct_transition_vector(u: int, v: int, n: int, face_index: int) -> Ve
 	vector[basis_data[BasisTable.N_AXIS]] = basis_table[face_index][BasisTable.PLANE]
 	return vector
 
+## Take a surface vector and apply a shift to it to allow a transitional slab to be inserted at LOD resolution borders.
 func _apply_shift(pos: Vector3, mask: int) -> Vector3:
 	var cell_pos := pos / lod_step
 	var shift_vector := Vector3.ZERO
@@ -540,6 +543,7 @@ func _apply_shift(pos: Vector3, mask: int) -> Vector3:
 	shift_vector -= field_normal * field_normal.dot(shift_vector)
 	return pos + shift_vector
 
+## Returns a normal of the scalar fields gradient at a specific world_vector
 func _get_field_normal(world_vector: Vector3) -> Vector3:
 	# distance to measure along the scalar to get the gradient
 	var step := transition_slab_width
@@ -557,11 +561,15 @@ func _get_field_normal(world_vector: Vector3) -> Vector3:
 func generate_mesh_data(transition_mask: int) -> void:
 	built_transition_mask = transition_mask
 	if _determine_if_cell_is_empty(): return
-	# var start_time := Time.get_ticks_usec()
+	var start_time := Time.get_ticks_usec()
 	var sample_data := _construct_sample_set(transition_mask)
 	if sample_data == null: mesh_data = null; return
 	mesh_data = _generate_mesh_data(sample_data.corner_samples, transition_mask, sample_data.transition_samples)
-	# print("chunk gen time: ", Time.get_ticks_usec() - start_time)
+	if Utils.debug == true:
+		call_deferred_thread_group("_emit_signal", Time.get_ticks_usec() - start_time)
+
+func _emit_signal(time: int) -> void:
+	Utils.emit_signal("chunk_generated", time)
 
 ## Creates a MeshInstance3D from given ArrayMesh, adds it to the tree, and creates collisions for it. 
 func build_mesh() -> void:

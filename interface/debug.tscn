@@ -13,17 +13,40 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("1_nngj5")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=979763049]
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=2009830241]
 layout_mode = 1
-anchors_preset = 10
+anchors_preset = 15
 anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
 
-[node name="ChunkInfo" type="Label" parent="VBoxContainer" unique_id=1618290342]
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxContainer" unique_id=979763049]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ChunkInfo" type="Label" parent="HBoxContainer/VBoxContainer" unique_id=1618290342]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Chunk:"
 
-[node name="Coords" type="Label" parent="VBoxContainer" unique_id=813808204]
+[node name="Coords" type="Label" parent="HBoxContainer/VBoxContainer" unique_id=813808204]
 unique_name_in_owner = true
 layout_mode = 2
+text = "Coords"
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="HBoxContainer" unique_id=612218279]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GenTime" type="Label" parent="HBoxContainer/VBoxContainer2" unique_id=853864137]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Gen Time"
+horizontal_alignment = 2
+
+[node name="UpdateGenTime" type="Timer" parent="." unique_id=893755423]
+autostart = true
+
+[connection signal="timeout" from="UpdateGenTime" to="." method="_on_update_gen_time_timeout"]
