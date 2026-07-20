@@ -8,7 +8,7 @@ extends Node3D
 ## ChunkManager.chunk_size * 2^size = total_volume. total_volume/2 = suface diameter. size = max_octree_depth in the ChunkManager.chunk_size. (ChunkManager.chunk_size = 20)
 @export var size := 5
 ## How quickly the planet rotates in radians/sec
-@export var rotation_speed := 0
+@export var rotation_speed := 0.04
 ## The axis that the planet spins on
 @export var rotation_axis := Vector3(randf(), randf(), randf()).normalized()
 

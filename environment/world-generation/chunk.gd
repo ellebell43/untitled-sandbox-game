@@ -1,6 +1,12 @@
 class_name Chunk
 extends Node3D
 
+@onready var wireframe_material := preload("res://test/wireframe-material.tres")
+
+# ============ DEBUG PROPERTIES ============
+
+var wireframe_mode = false
+
 # ============ BASIC CHUNK CHARACTERISTICS ============
 
 enum chunk_state {PROCESSING, ACTIVE, RETIRING, READY_TO_DIE}
@@ -337,16 +343,9 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 				cell_corner_set[5] = Vector3((x + 1), (y + 1), z) * lod_step
 				cell_corner_set[6] = Vector3(x, (y + 1), (z + 1)) * lod_step
 				cell_corner_set[7] = Vector3((x + 1), (y + 1), (z + 1)) * lod_step
-
-				if transition_mask != 0:
-					cell_corner_set[0] = _apply_shift(cell_corner_set[0], transition_mask)
-					cell_corner_set[1] = _apply_shift(cell_corner_set[1], transition_mask)
-					cell_corner_set[2] = _apply_shift(cell_corner_set[2], transition_mask)
-					cell_corner_set[3] = _apply_shift(cell_corner_set[3], transition_mask)
-					cell_corner_set[4] = _apply_shift(cell_corner_set[4], transition_mask)
-					cell_corner_set[5] = _apply_shift(cell_corner_set[5], transition_mask)
-					cell_corner_set[6] = _apply_shift(cell_corner_set[6], transition_mask)
-					cell_corner_set[7] = _apply_shift(cell_corner_set[7], transition_mask)
+				
+				for i in 8:
+					cell_corner_set[i] = _apply_shift(cell_corner_set[i], transition_mask)
 
 				# use class_index to determine the cell class, construct cell data, and get vertex count
 				var cell_class: int = TransvoxelLUT.REG_CELL_CLASS[class_index]
@@ -528,18 +527,31 @@ func _construct_transition_vector(u: int, v: int, n: int, face_index: int) -> Ve
 
 func _apply_shift(pos: Vector3, mask: int) -> Vector3:
 	var cell_pos := pos / lod_step
-	var new_vector := Vector3()
-	var _offset := 0.0
+	var shift_vector := Vector3.ZERO
 	for axis in 3:
 		var positive_flagged = (mask >> axis) & 1
 		var negative_flagged = (mask >> (axis + 3)) & 1
 		if negative_flagged and cell_pos[axis] < 1:
-			_offset = ((1 - cell_pos[axis]) * transition_slab_width)
+			shift_vector[axis] = ((1 - cell_pos[axis]) * transition_slab_width)
 		elif positive_flagged and cell_pos[axis] > size - 1:
-			_offset = ((size - 1 - cell_pos[axis]) * transition_slab_width)
-		new_vector[axis] = pos[axis] + _offset
-		_offset = 0.0
-	return new_vector
+			shift_vector[axis] = ((size - 1 - cell_pos[axis]) * transition_slab_width)
+	# Get the normal of the scalar field gradient at pos and use that to slide the shift along the gradient.
+	var field_normal := _get_field_normal(pos + offset)
+	shift_vector -= field_normal * field_normal.dot(shift_vector)
+	return pos + shift_vector
+
+func _get_field_normal(world_vector: Vector3) -> Vector3:
+	# distance to measure along the scalar to get the gradient
+	var step := transition_slab_width
+	# get gradient of the scalar field at the given vectors position.
+	var scalar_gradient := Vector3(
+		scalar.sample(world_vector.x + step, world_vector.y, world_vector.z) - scalar.sample(world_vector.x - step, world_vector.y, world_vector.z),
+		scalar.sample(world_vector.x, world_vector.y + step, world_vector.z) - scalar.sample(world_vector.x, world_vector.y - step, world_vector.z),
+		scalar.sample(world_vector.x, world_vector.y, world_vector.z + step) - scalar.sample(world_vector.x, world_vector.y, world_vector.z - step),
+	)
+	# If the gradient is greater than 0, return the gradient normalized. Otherwise return a ZERO vector.
+	if scalar_gradient.length_squared() > 0.0: return scalar_gradient.normalized()
+	else: return Vector3.ZERO
 
 ## constructs ArrayMesh data for building a MeshInstance3D for this chunk. mesh_data will be null if no data is/should be generated. Should be done off the main game thread.
 func generate_mesh_data(transition_mask: int) -> void:
@@ -564,6 +576,7 @@ func build_mesh() -> void:
 	self.add_child(mesh_instance)
 	mesh_instance.name = "ChunkMesh"
 	mesh_instance.mesh = mesh_data
+	if wireframe_mode: mesh_instance.material_override = wireframe_material
 	
 	if lod_step == 1:
 		mesh_instance.create_trimesh_collision()

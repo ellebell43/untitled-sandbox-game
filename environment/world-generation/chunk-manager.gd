@@ -21,7 +21,7 @@ var total_first_tasks: int
 ## The number of tasks actually completed. Emitted out and used by loading screen to determine 0% to 100%
 var tasks_emitted := 0
 ## How eagerly chunks split into finer chunks. The higher the number, the greater the distance gate to determine how fine the chunk is. 
-var distance_factor := 1
+var distance_factor := 2
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
 var root_node_size: int
 ## The maximum depth that the octree will go to. Same as Planet.size. (20 * 2^size = WorldNoise.size)
@@ -74,7 +74,7 @@ func _process(_delta: float) -> void:
 		if verbose: print("octree iterate time: ", Time.get_ticks_usec() - start_iterate_time)
 	# When the player passes the movement threshold, store the new position, clear the new leaf set, re-iterate through the octree, and compare leaf sets to update chunks
 	if player.position.distance_to(prev_player_pos) >= player_movement_threshold:
-		return
+		#return
 		prev_player_pos = player.position
 		new_chunk_set.clear()
 		_octree_iterate()
@@ -359,14 +359,14 @@ func _unload_octree_chunk(key: Array) -> void:
 	# remove chunk from leaf set and remove Chunk from scene tree if possible.
 	ready_to_die_chunk_set.erase(key)
 	if chunk_to_unload:
-		# var mesh_instance = chunk_to_unload.find_child("ChunkMesh", true, false)
+		var mesh_instance = chunk_to_unload.find_child("ChunkMesh", true, false)
 		#print(chunk_to_unload.get_children(true))
-		# if mesh_instance:
-		# 	var tween = create_tween()
-		# 	tween.tween_property(mesh_instance, "transparency", 1, 1)
-		# 	tween.tween_callback(chunk_to_unload.queue_free)
-		# else:
-		chunk_to_unload.queue_free()
+		if mesh_instance:
+			var tween = create_tween()
+			tween.tween_property(mesh_instance, "transparency", 1, 1)
+			tween.tween_callback(chunk_to_unload.queue_free)
+		else:
+			chunk_to_unload.queue_free()
 
 # ========== PUBLIC FUNCTIONS ==========
 
