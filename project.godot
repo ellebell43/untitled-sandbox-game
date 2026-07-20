@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="untitled-sandbox-game"
-run/main_scene="uid://dmj3gcid0qbdm"
+run/main_scene="uid://6jm4owdh3aqm"
 config/features=PackedStringArray("4.7", "Double Precision", "Forward Plus")
 config/icon="res://icon.svg"
 
