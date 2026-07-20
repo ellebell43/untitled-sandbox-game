@@ -23,3 +23,7 @@ grow_horizontal = 2
 unique_name_in_owner = true
 layout_mode = 2
 text = "Chunk:"
+
+[node name="Coords" type="Label" parent="VBoxContainer" unique_id=813808204]
+unique_name_in_owner = true
+layout_mode = 2
