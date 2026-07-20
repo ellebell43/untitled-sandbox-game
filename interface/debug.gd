@@ -1,0 +1,48 @@
+extends Control
+
+@export var player: Player
+
+@onready var chunk_info_label := %ChunkInfo
+@onready var coords_label := %Coords
+@onready var gen_time_label := %GenTime
+@onready var update_gen_time_timer := $UpdateGenTime 
+
+# chunk generation variables
+var total_generations := 0
+var average_generation := 0
+var max_generation := 0
+
+func _ready() -> void:
+	Utils.chunk_generated.connect(_on_chunk_generated)
+	
+func _process(_delta: float) -> void:
+	set_chunk_info_label()
+	set_coords_label()
+
+## Gets the current chunk manager for the player's current world, then get's the key for the chunk the player is currently in. Sets the text of ChunkInfo to show that information on screen.
+func set_chunk_info_label() -> void:
+	var chunk_manager := player.current_world.chunk_manager
+	if chunk_manager == null:
+		chunk_info_label.text = "chunk_pos: not found.\nlod_step: not found"
+	else:
+		var player_chunk_key := chunk_manager.get_player_chunk_key()
+		if player_chunk_key.size() == 0:
+			chunk_info_label.text = "chunk_pos: not found.\nlod_step: not found"
+		else:
+			var chunk_pos: Vector3i = player_chunk_key[0]
+			var chunk_lod_step: int = player_chunk_key[1]
+			chunk_info_label.text = "chunk_pos: %s\nlod_step: %d" % [str(chunk_pos / 20), chunk_lod_step]
+
+func set_coords_label() -> void:
+	var player_pos := Vector3i(player.global_position)
+	var player_planet_pos := Vector3i(player.current_world.to_local(player.global_position))
+	var current_world_name := player.current_world.name
+	coords_label.text = "planet: %s\nglobal_pos: %s\nlocal_pos: %s" % [current_world_name, str(player_pos), str(player_planet_pos)]
+
+func _on_chunk_generated(gen_time: int) -> void:
+	if gen_time > max_generation: max_generation = gen_time
+	average_generation = (average_generation + gen_time) / 2
+	total_generations += 1
+
+func _on_update_gen_time_timeout() -> void:
+	gen_time_label.text = "avg_chunk_gen: %d\nmax_chunk_gen: %d" % [average_generation, max_generation]

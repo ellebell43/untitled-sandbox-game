@@ -8,7 +8,7 @@ extends Node3D
 ## ChunkManager.chunk_size * 2^size = total_volume. total_volume/2 = suface diameter. size = max_octree_depth in the ChunkManager.chunk_size. (ChunkManager.chunk_size = 20)
 @export var size := 5
 ## How quickly the planet rotates in radians/sec
-@export var rotation_speed := .04
+@export var rotation_speed := 0.04
 ## The axis that the planet spins on
 @export var rotation_axis := Vector3(randf(), randf(), randf()).normalized()
 
@@ -38,9 +38,9 @@ func _ready() -> void:
 var n_tries = 0
 ## Called by Player to find a valid spawn point on this planet that places them 1m above a random point on the planet. Will cause an infinite loop if player is loaded in first. Ensure player is loaded in below all Planet nodes
 func get_valid_spawn_point() -> Vector3:
-	if Utils.verbose: print("spawn planet is ", self)
+	if Utils.debug: print("spawn planet is ", self)
 	n_tries += 1
-	if Utils.verbose: print("searching for spawn ", n_tries)
+	if Utils.debug: print("searching for spawn ", n_tries)
 	# create WorldNoise object with the same seed and size as planet. Cannot use chunk_manager since player may load in before chunk_manager
 	var noise := WorldNoise.new(world_seed, total_volume.x)
 	# get a random direction vector
@@ -60,7 +60,7 @@ func get_valid_spawn_point() -> Vector3:
 		var sample_pos = starting_pos + direction * i
 		var sample_scalar = noise.sample(sample_pos.x, sample_pos.y, sample_pos.z)
 		if i != 1 and prev_scalar < 0 and sample_scalar > 0:
-			if Utils.verbose: print("spawn location found: ", sample_pos)
+			if Utils.debug: print("spawn location found: ", sample_pos)
 			return sample_pos - volume_center + direction * 2 + global_position # set spawn to be 2 meters above the point found to ensure player is above the mesh.
 		prev_scalar = sample_scalar
 		i += 1
