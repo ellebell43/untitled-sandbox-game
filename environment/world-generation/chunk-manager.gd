@@ -2,7 +2,7 @@ extends Node3D
 class_name ChunkManager
 
 ## The size of each chunk in meters
-var chunk_size := 20
+var chunk_size := 16
 ## The number of chunks on each axis. Determined from passed in _max_octree_depth in _init()
 var chunk_count: int
 ## Scalar field that is used to determine the shape of the mesh along the chunks.
