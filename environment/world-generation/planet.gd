@@ -15,6 +15,14 @@ extends Node3D
 ## Reference to the shape of the GravityArea Area3D node. Size is set to diameter * 2 in _ready()
 @onready var gravity_shape := $GravityArea/GravityShape
 
+enum WorldType {
+	TEMPERATE,
+	HOT,
+	COLD,
+	BARREN,
+	GAS
+}
+
 ## Reference to the local ChunkManager for this planet.
 var chunk_manager: ChunkManager
 ## The size of the total noise volume on each axis. Determined by size: Vector3(20 * 2^size)

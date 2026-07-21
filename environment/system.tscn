@@ -10,6 +10,14 @@
 script = ExtResource("1_br15j")
 player = NodePath("Player")
 
+[node name="Environment" parent="." unique_id=1058607106 instance=ExtResource("1_7xck8")]
+
+[node name="Planet" parent="." unique_id=1766259659 node_paths=PackedStringArray("player") instance=ExtResource("3_wam8f")]
+player = NodePath("../Player")
+
+[node name="Player" parent="." unique_id=766571082 node_paths=PackedStringArray("spawn_world") instance=ExtResource("2_br15j")]
+spawn_world = NodePath("../Planet")
+
 [node name="Debug" parent="." unique_id=858674500 node_paths=PackedStringArray("player") instance=ExtResource("5_wam8f")]
 player = NodePath("../Player")
 
@@ -36,12 +44,3 @@ offset_bottom = 13.5
 grow_horizontal = 2
 grow_vertical = 2
 rounded = true
-
-[node name="Environment" parent="." unique_id=1058607106 instance=ExtResource("1_7xck8")]
-
-[node name="Planet" parent="." unique_id=1766259659 node_paths=PackedStringArray("player") instance=ExtResource("3_wam8f")]
-player = NodePath("../Player")
-size = 8
-
-[node name="Player" parent="." unique_id=766571082 node_paths=PackedStringArray("spawn_world") instance=ExtResource("2_br15j")]
-spawn_world = NodePath("../Planet")

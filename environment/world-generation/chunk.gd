@@ -293,6 +293,7 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 	# Arrays for storing generated mesh data
 	var mesh_vertices: PackedVector3Array = []
 	var mesh_normals: PackedVector3Array = []
+	var mesh_colors: PackedColorArray = []
 	
 	# Initialized arrays and stride values to 
 	var corner_scalar_values: PackedFloat32Array = []
@@ -378,6 +379,14 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 					mesh_vertices.append(vertex_b)
 					mesh_vertices.append(vertex_c)
 					
+					var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
+					var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
+					var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
+					
+					mesh_colors.append(scalar.get_biome_color(biome_a))
+					mesh_colors.append(scalar.get_biome_color(biome_b))
+					mesh_colors.append(scalar.get_biome_color(biome_c))
+					
 					# determine normal and append to normals array
 					var normal := - (vertex_b - vertex_a).cross(vertex_c - vertex_a).normalized()
 					mesh_normals.append(normal)
@@ -396,22 +405,23 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 	
 	# trasnition faces
 	if (transition_mask >> 0) & 1 == 1:
-		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[0], 0, mesh_vertices, mesh_normals, transition_mask)
+		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[0], 0, mesh_vertices, mesh_normals, transition_mask, mesh_colors)
 	if (transition_mask >> 1) & 1 == 1:
-		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[1], 1, mesh_vertices, mesh_normals, transition_mask)
+		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[1], 1, mesh_vertices, mesh_normals, transition_mask, mesh_colors)
 	if (transition_mask >> 2) & 1 == 1:
-		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[2], 2, mesh_vertices, mesh_normals, transition_mask)
+		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[2], 2, mesh_vertices, mesh_normals, transition_mask, mesh_colors)
 	if (transition_mask >> 3) & 1 == 1:
-		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[3], 3, mesh_vertices, mesh_normals, transition_mask)
+		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[3], 3, mesh_vertices, mesh_normals, transition_mask, mesh_colors)
 	if (transition_mask >> 4) & 1 == 1:
-		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[4], 4, mesh_vertices, mesh_normals, transition_mask)
+		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[4], 4, mesh_vertices, mesh_normals, transition_mask, mesh_colors)
 	if (transition_mask >> 5) & 1 == 1:
-		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[5], 5, mesh_vertices, mesh_normals, transition_mask)
+		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[5], 5, mesh_vertices, mesh_normals, transition_mask, mesh_colors)
 
 	var surface_arrays: Array = []
 	surface_arrays.resize(Mesh.ARRAY_MAX)
 	surface_arrays[Mesh.ARRAY_VERTEX] = mesh_vertices
 	surface_arrays[Mesh.ARRAY_NORMAL] = mesh_normals
+	surface_arrays[Mesh.ARRAY_COLOR] = mesh_colors
 	
 	# create the mesh and assign data to it
 	var array_mesh := ArrayMesh.new()
@@ -419,7 +429,7 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 	return array_mesh
 
 ## Create the transitional data for cells on the transition face of a chunk
-func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_vertices: PackedVector3Array, actual_vertices: PackedVector3Array, transition_samples: PackedFloat32Array, face_index: int, mesh_vertices: PackedVector3Array, mesh_normals: PackedVector3Array, transition_mask: int):
+func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_vertices: PackedVector3Array, actual_vertices: PackedVector3Array, transition_samples: PackedFloat32Array, face_index: int, mesh_vertices: PackedVector3Array, mesh_normals: PackedVector3Array, transition_mask: int, mesh_colors: PackedColorArray):
 	for u in size:
 		for v in size:
 			values_arr[0] = transition_samples[(2 * u) * face_stride + (2 * v)]
@@ -501,10 +511,26 @@ func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_
 					mesh_vertices.append(vertex_a)
 					mesh_vertices.append(vertex_b)
 					mesh_vertices.append(vertex_c)
+					
+					var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
+					var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
+					var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
+					
+					mesh_colors.append(scalar.get_biome_color(biome_a))
+					mesh_colors.append(scalar.get_biome_color(biome_b))
+					mesh_colors.append(scalar.get_biome_color(biome_c))
 				else:
 					mesh_vertices.append(vertex_a)
 					mesh_vertices.append(vertex_c)
 					mesh_vertices.append(vertex_b)
+					
+					var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
+					var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
+					var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
+					
+					mesh_colors.append(scalar.get_biome_color(biome_a))
+					mesh_colors.append(scalar.get_biome_color(biome_c))
+					mesh_colors.append(scalar.get_biome_color(biome_b))
 					
 				# determine normal and append to normals array
 				var normal: Vector3
@@ -585,6 +611,10 @@ func build_mesh() -> void:
 	mesh_instance.name = "ChunkMesh"
 	mesh_instance.mesh = mesh_data
 	if wireframe_mode: mesh_instance.material_override = wireframe_material
+	else:
+		var material = StandardMaterial3D.new()
+		material.vertex_color_use_as_albedo = true
+		mesh_instance.material_override = material
 	
 	if lod_step == 1:
 		mesh_instance.create_trimesh_collision()
