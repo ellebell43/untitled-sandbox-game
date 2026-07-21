@@ -16,6 +16,7 @@ func _ready() -> void:
 	Utils.chunk_generated.connect(_on_chunk_generated)
 	
 func _process(_delta: float) -> void:
+	if player == null or player.current_world == null: return
 	set_chunk_info_label()
 	set_coords_label()
 
