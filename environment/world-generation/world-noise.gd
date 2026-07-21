@@ -1,16 +1,13 @@
 class_name WorldNoise
 extends RefCounted
 
-enum Biome {
-	FROZEN,
+enum TEMPERATURE {
 	COLD,
 	TEMPERATE,
 	HOT,
-	BURNING,
 }
 
 var terrain_noise := FastNoiseLite.new()
-var temp_noise := FastNoiseLite.new()
 var _amplitude := 2
 ## where the general floor is located, relative to the center of the world
 var _floor: float
@@ -18,8 +15,16 @@ var _floor: float
 var center: Vector3
 ## How strong fall the bias is towards being inside or outside of the volume relative to _floor
 var floor_bias := .2
-var temp_bias := .5
 const BIAS_THRESHOLD := 1.1
+
+var temp_noise := FastNoiseLite.new()
+var temp_amplitude := 4
+const TEMP_BIAS_WEIGHT := 1
+const HOT_THRESHOLD := .7
+const TEMPERATE_THRESHOLD := 0
+const COLD_THRESHOLD := -.8
+
+var print_count := 0
 
 func _init(_seed: int, size: float):
 	terrain_noise.noise_type = FastNoiseLite.TYPE_PERLIN
@@ -32,7 +37,7 @@ func _init(_seed: int, size: float):
 	_floor = size / 2 / 2
 	
 	temp_noise.noise_type = FastNoiseLite.TYPE_PERLIN
-	temp_noise.frequency = .005
+	temp_noise.frequency = 0
 	temp_noise.fractal_octaves = 4
 	temp_noise.fractal_lacunarity = 2
 	temp_noise.fractal_gain = 0.5
@@ -45,13 +50,23 @@ func sample(x: float, y: float, z: float) -> float:
 	var bias := get_bias_at_point(pos)
 	return (_sample + bias) * _amplitude
 
+# TO DO: change funciton name to sample temperature. Biome will be a construction of multiple values such as temperature and humidity.
 func sample_biome(point: Vector3) -> float:
-	var y_value: float
-	if point.y > 0: y_value = center.y + _floor
-	else: y_value = center.y - _floor
 	var _sample := temp_noise.get_noise_3d(point.x, point.y, point.z)
-	var bias := get_bias_at_point(point, Vector3(point.x, y_value, point.z), 0, temp_bias)
-	return (_sample - bias) * _amplitude
+	var equator := center.y
+	var distance_to_equator = abs(point.y - equator)
+	if distance_to_equator < _floor * 0.2:
+		# HOT. Bias toward 0.75 - 0.25 (+0.5)
+		return bias_temperature_value(_sample, HOT_THRESHOLD, TEMP_BIAS_WEIGHT)
+	elif distance_to_equator < _floor * 0.75:
+		# TEMPERATE. Bias toward -0.25 - 0.25 (0)
+		return bias_temperature_value(_sample, TEMPERATE_THRESHOLD, TEMP_BIAS_WEIGHT)
+	else:
+		# COLD. Bias toward -0.75 - -0.25 (-0.5)
+		return bias_temperature_value(_sample, COLD_THRESHOLD, TEMP_BIAS_WEIGHT)
+
+func bias_temperature_value(_sample: float, bias_target: float, bias_strength: float) -> float:
+	return lerp(_sample, bias_target, bias_strength)
 
 func get_bias_at_point(point: Vector3, distance_target := center, bias_target := _floor, bias := floor_bias) -> float:
 	var distance_to_center := point.distance_to(distance_target)
@@ -60,21 +75,17 @@ func get_bias_at_point(point: Vector3, distance_target := center, bias_target :=
 func get_bias_from_distance(distance: float, bias_target := _floor, bias := floor_bias) -> float:
 	return (distance - bias_target) * bias
 
-func get_biome(sample_value: float) -> Biome:
-	if sample_value <= -0.25:
-		return Biome.FROZEN
-	if sample_value <= -0.75:
-		return Biome.COLD
-	if sample_value <= 0.25:
-		return Biome.TEMPERATE
-	if sample_value <= .75:
-		return Biome.BURNING
-	return Biome.HOT
+func get_biome(sample_value: float) -> TEMPERATURE:
+	if sample_value <= COLD_THRESHOLD:
+		return TEMPERATURE.COLD
+	elif sample_value <= TEMPERATE_THRESHOLD:
+		return TEMPERATURE.TEMPERATE
+	else:
+		return TEMPERATURE.HOT
 
-func get_biome_color(biome: Biome) -> Color:
+func get_biome_color(biome: TEMPERATURE) -> Color:
 	match biome:
-		Biome.FROZEN: return Color.WHITE
-		Biome.COLD: return Color.LIGHT_BLUE
-		Biome.TEMPERATE: return Color.YELLOW_GREEN
-		Biome.HOT: return Color.ORANGE
-	return Color.ORANGE_RED
+		TEMPERATURE.COLD: return Color.SKY_BLUE
+		TEMPERATURE.TEMPERATE: return Color.LAWN_GREEN
+		TEMPERATURE.HOT: return Color.RED
+	return Color.HOT_PINK
