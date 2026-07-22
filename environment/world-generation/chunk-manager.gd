@@ -19,7 +19,7 @@ var total_first_tasks: int
 ## The number of tasks actually completed. Emitted out and used by loading screen to determine 0% to 100%
 var tasks_emitted := 0
 ## How eagerly chunks split into finer chunks. The higher the number, the greater the distance gate to determine how fine the chunk is. 
-var distance_factor := 1.5
+var distance_factor := 1
 ## The total size of the noise volume, and therefore the size of the root octree node. Where the entire volume is treated as 1 chunk_size chunk
 var root_node_size: int
 ## The maximum depth that the octree will go to. Same as Planet.size. (20 * 2^size = WorldNoise.size)
@@ -153,14 +153,14 @@ func _find_masks() -> void:
 		# mask is a 6-bit value. Each bit represents if a face should have transition cells or not (1 for yes, 0 for no). 
 		# mask bits: x, y, z, -x, -y, -z
 		var mask := 0
-		if key[1] == 1: new_chunk_set.set(key, mask); continue
+		if key[1] == chunk_count: new_chunk_set.set(key, mask); continue
 
 		var x_positive := _does_face_need_transition_cells(key[0], key[1], Vector3i(1, 0, 0))
-		var x_negative := _does_face_need_transition_cells(key[0], key[1], Vector3i(-1, 0, 0), true)
+		var x_negative := _does_face_need_transition_cells(key[0], key[1], Vector3i(-1, 0, 0))
 		var y_positive := _does_face_need_transition_cells(key[0], key[1], Vector3i(0, 1, 0))
-		var y_negative := _does_face_need_transition_cells(key[0], key[1], Vector3i(0, -1, 0), true)
+		var y_negative := _does_face_need_transition_cells(key[0], key[1], Vector3i(0, -1, 0))
 		var z_positive := _does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, 1))
-		var z_negative := _does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, -1), true)
+		var z_negative := _does_face_need_transition_cells(key[0], key[1], Vector3i(0, 0, -1))
 
 		if x_positive: mask |= (1 << 0)
 		if y_positive: mask |= (1 << 1)
@@ -171,15 +171,21 @@ func _find_masks() -> void:
 
 		new_chunk_set.set(key, mask)
 
-func _does_face_need_transition_cells(pos: Vector3i, lod_step: int, direction: Vector3i, is_negative := false) -> bool:
-	var chunk_length := lod_step * chunk_size
-	if is_negative: chunk_length /= 2
-	var chunk_length_vector := Vector3i(chunk_length, chunk_length, chunk_length)
-	var neighbor_pos := pos + chunk_length_vector * direction
-	# if neighbor in given direction is same size, return false
-	@warning_ignore("integer_division")
-	if new_chunk_set.has([neighbor_pos, lod_step / 2]): return true
-	else: return false
+func _does_face_need_transition_cells(pos: Vector3i, lod_step: int, direction: Vector3i) -> bool:
+	var coarse_step := lod_step * 2
+	var coarse_length := coarse_step * chunk_size
+	var fine_length := lod_step * chunk_size
+	# move to the face plane (add fine_length only on positive axes), then step just across it
+	var face_point := Vector3(pos)
+	for axis in 3:
+		if direction[axis] > 0: face_point[axis] += fine_length
+	var probe := face_point + Vector3(direction) * 0.5
+	var origin := Vector3i(
+		floor(probe.x / coarse_length) * coarse_length,
+		floor(probe.y / coarse_length) * coarse_length,
+		floor(probe.z / coarse_length) * coarse_length,
+	)
+	return new_chunk_set.has([origin, coarse_step])
 
 ## Compare new_chunk_set vs pending_chunk_set and active_chunk_set to determine chunks to load and then load them
 func _load_new_chunks() -> void:

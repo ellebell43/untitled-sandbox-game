@@ -47,14 +47,14 @@ var x_stride: int
 var face_stride: int
 
 ## Used when calling values from `basis_table` so that the varialbes make sense. The index of the array item maps to the corresponding face using the same conventions as the transition mask: x,y,z,-x,-y,-z. `U_AXIS` and `V_AXIS` is the equivalent x and y axis for the given face derived from a Vector3 and represented as an int. `N_AXIS` is the global x, y, or z axis represnted as an int: 0 = x, 1 = y, 2 = z. `PLANE` defines where the face is located relative to the loop location on it's given axis
-enum BasisTable {
+enum BASIS_TABLE {
 	U_AXIS,
 	V_AXIS,
 	N_AXIS,
 	PLANE
 }
 
-## Set of arrays defining values for specific transition faces. See the definition for `enum BasisTable` for details.
+## Set of arrays defining values for specific transition faces. See the definition for `enum BASIS_TABLE` for details.
 var basis_table: Array[PackedInt32Array] = []
 
 func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
@@ -64,7 +64,7 @@ func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 	self.lod_step = _lod_step
 	self.y_stride = size + 1
 	self.x_stride = (size + 1) * (size + 1)
-	self.face_stride = 2 * size + 1
+	self.face_stride = size + 1
 	self.basis_table = [
 		[1, 2, 0, size * lod_step],
 		[2, 0, 1, size * lod_step],
@@ -73,7 +73,7 @@ func _init(_size: int, _noise: WorldNoise, _offset: Vector3, _lod_step: int):
 		[0, 2, 1, 0],
 		[1, 0, 2, 0],
 	]
-	self.transition_slab_width = lod_step / 4.0
+	self.transition_slab_width = lod_step / 2.0
 
 func _determine_if_cell_is_empty() -> bool:
 	var axis_length := size * lod_step
@@ -130,19 +130,16 @@ func _construct_sample_set(mask: int = 0) -> SampleSetReturnType:
 		var x_value := x * lod_step + offset.x
 		var x_negative_transition := x == 0 and (mask >> 3) & 1 == 1
 		var x_positive_transition := x == size and (mask >> 0) & 1 == 1
-		var xi = x * 2
 
 		for y in size + 1:
 			var y_value = y * lod_step + offset.y
 			var y_negative_transition := y == 0 and (mask >> 4) & 1 == 1
 			var y_positive_transition := y == size and (mask >> 1) & 1 == 1
-			var yi = y * 2
 
 			for z in size + 1:
 				var z_value = z * lod_step + offset.z
 				var z_negative_transition := z == 0 and (mask >> 5) & 1 == 1
 				var z_positive_transition := z == size and (mask >> 2) & 1 == 1
-				var zi = z * 2
 
 				# Get corner sample and add it to corner samples array. Index is calculated instead of appended since the array is a specific size
 				var corner_sample := scalar.sample(
@@ -204,17 +201,17 @@ func _construct_sample_set(mask: int = 0) -> SampleSetReturnType:
 
 				# get transition samples and add them to their corresponding arrays on a per-transition-face basis
 				if x_positive_transition:
-					_get_transition_samples(transition_samples, 0, Vector3(x_value, y_value, z_value), basis_table[0][BasisTable.U_AXIS], basis_table[0][BasisTable.V_AXIS], yi, zi, y, z, corner_sample)
+					_get_transition_samples(transition_samples, 0, Vector3(x_value, y_value, z_value), basis_table[0][BASIS_TABLE.U_AXIS], basis_table[0][BASIS_TABLE.V_AXIS], y, z, corner_sample)
 				if y_positive_transition:
-					_get_transition_samples(transition_samples, 1, Vector3(x_value, y_value, z_value), basis_table[1][BasisTable.U_AXIS], basis_table[1][BasisTable.V_AXIS], zi, xi, z, x, corner_sample)
+					_get_transition_samples(transition_samples, 1, Vector3(x_value, y_value, z_value), basis_table[1][BASIS_TABLE.U_AXIS], basis_table[1][BASIS_TABLE.V_AXIS], z, x, corner_sample)
 				if z_positive_transition:
-					_get_transition_samples(transition_samples, 2, Vector3(x_value, y_value, z_value), basis_table[2][BasisTable.U_AXIS], basis_table[2][BasisTable.V_AXIS], xi, yi, x, y, corner_sample)
+					_get_transition_samples(transition_samples, 2, Vector3(x_value, y_value, z_value), basis_table[2][BASIS_TABLE.U_AXIS], basis_table[2][BASIS_TABLE.V_AXIS], x, y, corner_sample)
 				if x_negative_transition:
-					_get_transition_samples(transition_samples, 3, Vector3(x_value, y_value, z_value), basis_table[3][BasisTable.U_AXIS], basis_table[3][BasisTable.V_AXIS], zi, yi, z, y, corner_sample)
+					_get_transition_samples(transition_samples, 3, Vector3(x_value, y_value, z_value), basis_table[3][BASIS_TABLE.U_AXIS], basis_table[3][BASIS_TABLE.V_AXIS], z, y, corner_sample)
 				if y_negative_transition:
-					_get_transition_samples(transition_samples, 4, Vector3(x_value, y_value, z_value), basis_table[4][BasisTable.U_AXIS], basis_table[4][BasisTable.V_AXIS], xi, zi, x, z, corner_sample)
+					_get_transition_samples(transition_samples, 4, Vector3(x_value, y_value, z_value), basis_table[4][BASIS_TABLE.U_AXIS], basis_table[4][BASIS_TABLE.V_AXIS], x, z, corner_sample)
 				if z_negative_transition:
-					_get_transition_samples(transition_samples, 5, Vector3(x_value, y_value, z_value), basis_table[5][BasisTable.U_AXIS], basis_table[5][BasisTable.V_AXIS], yi, xi, y, x, corner_sample)
+					_get_transition_samples(transition_samples, 5, Vector3(x_value, y_value, z_value), basis_table[5][BASIS_TABLE.U_AXIS], basis_table[5][BASIS_TABLE.V_AXIS], y, x, corner_sample)
 				
 
 				if corner_sample > isosurface: is_all_below = false
@@ -236,7 +233,6 @@ func _get_transition_samples(
 		transition_samples: Array[PackedFloat32Array], child_arr: int,
 		loop_values: Vector3,
 		u_axis: int, v_axis: int,
-		ui: int, vi: int,
 		u: int, v: int,
 		corner_sample: float
 	) -> void:
@@ -245,10 +241,10 @@ func _get_transition_samples(
 	var s4_position := loop_values
 
 	# Manipulate sample positions based on TRANSITION FACE POINTS REFERENCE
-	s1_position[u_axis] += lod_step / 2.0
-	s3_position[v_axis] += lod_step / 2.0
-	s4_position[u_axis] += lod_step / 2.0
-	s4_position[v_axis] += lod_step / 2.0
+	s1_position[u_axis] += lod_step
+	s3_position[v_axis] += lod_step
+	s4_position[u_axis] += lod_step
+	s4_position[v_axis] += lod_step
 
 	# sample and inject to the correct array depending on where this point is located. 
 	# If u,v are below their axes' maximum, sample/inject all points
@@ -257,18 +253,18 @@ func _get_transition_samples(
 		var s3_sample := scalar.sample(s3_position.x, s3_position.y, s3_position.z)
 		var s4_sample := scalar.sample(s4_position.x, s4_position.y, s4_position.z)
 		# add corner + all 3 transition samples to transition face array
-		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, s1_sample, s3_sample, s4_sample)
+		_inject_transition_samples(transition_samples, child_arr, u, v, corner_sample, s1_sample, s3_sample, s4_sample)
 	# If only u is below is axis' maximum, sample/inject only s1 and corner_sample
 	elif u < size and not v < size:
 		var s1_sample := scalar.sample(s1_position.x, s1_position.y, s1_position.z)
-		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, s1_sample, null, null)
+		_inject_transition_samples(transition_samples, child_arr, u, v, corner_sample, s1_sample, null, null)
 	# If only v is below is axis' maximum, sample/inject only s3 and corner_sample
 	elif not u < size and v < size:
 		var s3_sample := scalar.sample(s3_position.x, s3_position.y, s3_position.z)
-		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, null, s3_sample, null)
+		_inject_transition_samples(transition_samples, child_arr, u, v, corner_sample, null, s3_sample, null)
 	# If both u,v are at their axes' maximum, sample/inject only corner_sample
 	else:
-		_inject_transition_samples(transition_samples, child_arr, ui, vi, corner_sample, null, null, null)
+		_inject_transition_samples(transition_samples, child_arr, u, v, corner_sample, null, null, null)
 
 func _inject_transition_samples(transition_samples: Array[PackedFloat32Array], child_arr: int, ui: int, vi: int, corner_sample: float, s1 = null, s3 = null, s4 = null) -> void:
 	transition_samples[child_arr][ui * face_stride + vi] = corner_sample
@@ -379,13 +375,13 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 					mesh_vertices.append(vertex_b)
 					mesh_vertices.append(vertex_c)
 					
-					var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
-					var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
-					var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
+					# var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
+					# var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
+					# var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
 					
-					mesh_colors.append(scalar.get_biome_color(biome_a))
-					mesh_colors.append(scalar.get_biome_color(biome_b))
-					mesh_colors.append(scalar.get_biome_color(biome_c))
+					# mesh_colors.append(scalar.get_biome_color(biome_a))
+					# mesh_colors.append(scalar.get_biome_color(biome_b))
+					# mesh_colors.append(scalar.get_biome_color(biome_c))
 					
 					# determine normal and append to normals array
 					var normal := - (vertex_b - vertex_a).cross(vertex_c - vertex_a).normalized()
@@ -403,7 +399,7 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 	transition_vertex_set.resize(13)
 	var actual_vertices: PackedVector3Array = []
 	
-	# trasnition faces
+	# transition faces
 	if (transition_mask >> 0) & 1 == 1:
 		_construct_transition_data(transition_scalar_values, transition_vertex_set, actual_vertices, transition_samples[0], 0, mesh_vertices, mesh_normals, transition_mask, mesh_colors)
 	if (transition_mask >> 1) & 1 == 1:
@@ -421,7 +417,7 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 	surface_arrays.resize(Mesh.ARRAY_MAX)
 	surface_arrays[Mesh.ARRAY_VERTEX] = mesh_vertices
 	surface_arrays[Mesh.ARRAY_NORMAL] = mesh_normals
-	surface_arrays[Mesh.ARRAY_COLOR] = mesh_colors
+	# surface_arrays[Mesh.ARRAY_COLOR] = mesh_colors
 	
 	# create the mesh and assign data to it
 	var array_mesh := ArrayMesh.new()
@@ -430,8 +426,8 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 
 ## Create the transitional data for cells on the transition face of a chunk
 func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_vertices: PackedVector3Array, actual_vertices: PackedVector3Array, transition_samples: PackedFloat32Array, face_index: int, mesh_vertices: PackedVector3Array, mesh_normals: PackedVector3Array, transition_mask: int, mesh_colors: PackedColorArray):
-	for u in size:
-		for v in size:
+	for u in size / 2:
+		for v in size / 2:
 			values_arr[0] = transition_samples[(2 * u) * face_stride + (2 * v)]
 			values_arr[1] = transition_samples[(2 * u + 1 % 3) * face_stride + (2 * v + 1 / 3)]
 			values_arr[2] = transition_samples[(2 * u + 2 % 3) * face_stride + (2 * v + 2 / 3)]
@@ -463,24 +459,26 @@ func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_
 				continue
 			
 			# Define real position of transition data
-			transition_data_vertices[0] = _construct_transition_vector(u, v, 0, face_index)
-			transition_data_vertices[1] = _construct_transition_vector(u, v, 1, face_index)
-			transition_data_vertices[2] = _construct_transition_vector(u, v, 2, face_index)
-			transition_data_vertices[3] = _construct_transition_vector(u, v, 3, face_index)
-			transition_data_vertices[4] = _construct_transition_vector(u, v, 4, face_index)
-			transition_data_vertices[5] = _construct_transition_vector(u, v, 5, face_index)
-			transition_data_vertices[6] = _construct_transition_vector(u, v, 6, face_index)
-			transition_data_vertices[7] = _construct_transition_vector(u, v, 7, face_index)
-			transition_data_vertices[8] = _construct_transition_vector(u, v, 8, face_index)
-			transition_data_vertices[9] = _apply_shift(transition_data_vertices[0], transition_mask)
-			transition_data_vertices[10] = _apply_shift(transition_data_vertices[2], transition_mask)
-			transition_data_vertices[11] = _apply_shift(transition_data_vertices[6], transition_mask)
-			transition_data_vertices[12] = _apply_shift(transition_data_vertices[8], transition_mask)
+			# Coarse chunk vertices
+			transition_data_vertices[0] = _apply_shift(_construct_transition_vector(u, v, 0, face_index), transition_mask)
+			transition_data_vertices[1] = _apply_shift(_construct_transition_vector(u, v, 1, face_index), transition_mask)
+			transition_data_vertices[2] = _apply_shift(_construct_transition_vector(u, v, 2, face_index), transition_mask)
+			transition_data_vertices[3] = _apply_shift(_construct_transition_vector(u, v, 3, face_index), transition_mask)
+			transition_data_vertices[4] = _apply_shift(_construct_transition_vector(u, v, 4, face_index), transition_mask)
+			transition_data_vertices[5] = _apply_shift(_construct_transition_vector(u, v, 5, face_index), transition_mask)
+			transition_data_vertices[6] = _apply_shift(_construct_transition_vector(u, v, 6, face_index), transition_mask)
+			transition_data_vertices[7] = _apply_shift(_construct_transition_vector(u, v, 7, face_index), transition_mask)
+			transition_data_vertices[8] = _apply_shift(_construct_transition_vector(u, v, 8, face_index), transition_mask)
+			# Fine chunk vertices
+			transition_data_vertices[9] = _construct_transition_vector(u, v, 0, face_index)
+			transition_data_vertices[10] = _construct_transition_vector(u, v, 2, face_index)
+			transition_data_vertices[11] = _construct_transition_vector(u, v, 6, face_index)
+			transition_data_vertices[12] = _construct_transition_vector(u, v, 8, face_index)
 
 
 			# use class_index to determine the cell class, construct cell data, and get vertex count
 			var class_byte: int = TransvoxelLUT.TRANS_CELL_CLASS[class_index]
-			var invert_value := (class_byte & 0x80) != 0
+			var invert_value := (class_byte & 0x80) == 0
 			var cell_class := class_byte & 0x7F
 			var vertex_count := TransvoxelLUT.get_vertex_count(TransvoxelLUT.TRANS_CELL_DATA[cell_class][0])
 		
@@ -512,25 +510,25 @@ func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_
 					mesh_vertices.append(vertex_b)
 					mesh_vertices.append(vertex_c)
 					
-					var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
-					var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
-					var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
+					# var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
+					# var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
+					# var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
 					
-					mesh_colors.append(scalar.get_biome_color(biome_a))
-					mesh_colors.append(scalar.get_biome_color(biome_b))
-					mesh_colors.append(scalar.get_biome_color(biome_c))
+					# mesh_colors.append(scalar.get_biome_color(biome_a))
+					# mesh_colors.append(scalar.get_biome_color(biome_b))
+					# mesh_colors.append(scalar.get_biome_color(biome_c))
 				else:
 					mesh_vertices.append(vertex_a)
 					mesh_vertices.append(vertex_c)
 					mesh_vertices.append(vertex_b)
 					
-					var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
-					var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
-					var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
+					# var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
+					# var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
+					# var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
 					
-					mesh_colors.append(scalar.get_biome_color(biome_a))
-					mesh_colors.append(scalar.get_biome_color(biome_c))
-					mesh_colors.append(scalar.get_biome_color(biome_b))
+					# mesh_colors.append(scalar.get_biome_color(biome_a))
+					# mesh_colors.append(scalar.get_biome_color(biome_c))
+					# mesh_colors.append(scalar.get_biome_color(biome_b))
 					
 				# determine normal and append to normals array
 				var normal: Vector3
@@ -544,13 +542,13 @@ func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_
 			
 			actual_vertices.clear()
 
-## Construct transitional vectors for a cell on a chunks face. `u` and `v` are the two axes of the chunks face that needs the cell and are each either the `x`, `y`, or `z` axis from the chunk. `n` is the the transition vertex index. `face_index` is a 6-bit iteger that represents which chunk faces need transtion cells
+## Construct transitional vectors for a cell on a chunks face. `u` and `v` are the two axes of the chunks face that needs the cell and are each either the `x`, `y`, or `z` axis from the chunk. `n` is the the transition vertex index. `face_index` is a 6-bit iNteger that represents which chunk faces need transition cells
 func _construct_transition_vector(u: int, v: int, n: int, face_index: int) -> Vector3:
 	var vector := Vector3()
 	var basis_data := basis_table[face_index]
-	vector[basis_data[BasisTable.U_AXIS]] = (2 * u + n % 3) * lod_step / 2.0
-	vector[basis_data[BasisTable.V_AXIS]] = (2 * v + n / 3) * lod_step / 2.0
-	vector[basis_data[BasisTable.N_AXIS]] = basis_table[face_index][BasisTable.PLANE]
+	vector[basis_data[BASIS_TABLE.U_AXIS]] = (2 * u + n % 3) * lod_step
+	vector[basis_data[BASIS_TABLE.V_AXIS]] = (2 * v + n / 3) * lod_step
+	vector[basis_data[BASIS_TABLE.N_AXIS]] = basis_data[BASIS_TABLE.PLANE]
 	return vector
 
 ## Take a surface vector and apply a shift to it to allow a transitional slab to be inserted at LOD resolution borders.
@@ -611,10 +609,10 @@ func build_mesh() -> void:
 	mesh_instance.name = "ChunkMesh"
 	mesh_instance.mesh = mesh_data
 	if wireframe_mode: mesh_instance.material_override = wireframe_material
-	else:
-		var material = StandardMaterial3D.new()
-		material.vertex_color_use_as_albedo = true
-		mesh_instance.material_override = material
+	# else:
+	# 	var material = StandardMaterial3D.new()
+	# 	material.vertex_color_use_as_albedo = true
+	# 	mesh_instance.material_override = material
 	
 	if lod_step == 1:
 		mesh_instance.create_trimesh_collision()
