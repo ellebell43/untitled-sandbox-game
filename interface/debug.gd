@@ -9,6 +9,7 @@ extends Control
 
 # chunk generation variables
 var total_generations := 0
+var total_generation_time := 0
 var average_generation := 0
 var max_generation := 0
 
@@ -42,8 +43,8 @@ func set_coords_label() -> void:
 
 func _on_chunk_generated(gen_time: int) -> void:
 	if gen_time > max_generation: max_generation = gen_time
-	average_generation = (average_generation + gen_time) / 2
+	total_generation_time += gen_time
 	total_generations += 1
 
 func _on_update_gen_time_timeout() -> void:
-	gen_time_label.text = "avg_chunk_gen: %d\nmax_chunk_gen: %d" % [average_generation, max_generation]
+	gen_time_label.text = "avg_chunk_gen: %d\nmax_chunk_gen: %d" % [total_generation_time / total_generations, max_generation]
