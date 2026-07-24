@@ -375,14 +375,6 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 					mesh_vertices.append(vertex_b)
 					mesh_vertices.append(vertex_c)
 					
-					# var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
-					# var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
-					# var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
-					
-					# mesh_colors.append(scalar.get_biome_color(biome_a))
-					# mesh_colors.append(scalar.get_biome_color(biome_b))
-					# mesh_colors.append(scalar.get_biome_color(biome_c))
-					
 					# determine normal and append to normals array
 					var normal := - (vertex_b - vertex_a).cross(vertex_c - vertex_a).normalized()
 					mesh_normals.append(normal)
@@ -509,26 +501,10 @@ func _construct_transition_data(values_arr: PackedFloat32Array, transition_data_
 					mesh_vertices.append(vertex_a)
 					mesh_vertices.append(vertex_b)
 					mesh_vertices.append(vertex_c)
-					
-					# var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
-					# var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
-					# var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
-					
-					# mesh_colors.append(scalar.get_biome_color(biome_a))
-					# mesh_colors.append(scalar.get_biome_color(biome_b))
-					# mesh_colors.append(scalar.get_biome_color(biome_c))
 				else:
 					mesh_vertices.append(vertex_a)
 					mesh_vertices.append(vertex_c)
 					mesh_vertices.append(vertex_b)
-					
-					# var biome_a = scalar.get_biome(scalar.sample_biome(vertex_a + offset))
-					# var biome_b = scalar.get_biome(scalar.sample_biome(vertex_b + offset))
-					# var biome_c = scalar.get_biome(scalar.sample_biome(vertex_c + offset))
-					
-					# mesh_colors.append(scalar.get_biome_color(biome_a))
-					# mesh_colors.append(scalar.get_biome_color(biome_c))
-					# mesh_colors.append(scalar.get_biome_color(biome_b))
 					
 				# determine normal and append to normals array
 				var normal: Vector3
