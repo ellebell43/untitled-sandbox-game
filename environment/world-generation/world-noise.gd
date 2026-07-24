@@ -9,6 +9,8 @@ var center: Vector3
 ## How strong fall the bias is towards being inside or outside of the volume relative to floor_distance
 const FLOOR_BIAS := .2
 const AMPLITUDE := 2
+# Used in Chunk._determine_if_cell_is_empty() to precompute if a cell is empty before sampling.
+const BIAS_THRESHOLD := 1.1
 
 func _init(_seed: int, size: float):
 	terrain_noise.noise_type = FastNoiseLite.TYPE_PERLIN
@@ -24,13 +26,8 @@ func _init(_seed: int, size: float):
 func sample(x: float, y: float, z: float) -> float:
 	var _sample := terrain_noise.get_noise_3d(x, y, z)
 	var pos := Vector3(x, y, z)
-	var distance_to_center := pos.distance_to(center)
-	var bias := distance_to_center * FLOOR_BIAS
+	var bias := (pos.distance_to(center) - floor_distance) * FLOOR_BIAS
 	return (_sample + bias) * AMPLITUDE
 
-#func get_bias_at_point(point: Vector3, distance_target := center, bias_target := floor_distance, bias := FLOOR_BIAS) -> float:
-	#var distance_to_center := point.distance_to(distance_target)
-	#return get_bias_from_distance(distance_to_center, bias_target, bias)
-
-func get_bias_from_distance(distance: float, bias_target := floor_distance, bias := FLOOR_BIAS) -> float:
-	return (distance - bias_target) * bias
+func get_bias_from_distance(distance: float) -> float:
+	return (distance - floor_distance) * FLOOR_BIAS

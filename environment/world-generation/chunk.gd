@@ -341,8 +341,9 @@ func _generate_mesh_data(corner_samples: PackedFloat32Array, transition_mask: in
 				cell_corner_set[6] = Vector3(x, (y + 1), (z + 1)) * lod_step
 				cell_corner_set[7] = Vector3((x + 1), (y + 1), (z + 1)) * lod_step
 				
-				for i in 8:
-					cell_corner_set[i] = _apply_shift(cell_corner_set[i], transition_mask)
+				if transition_mask != 0:
+					for i in 8:
+						cell_corner_set[i] = _apply_shift(cell_corner_set[i], transition_mask)
 
 				# use class_index to determine the cell class, construct cell data, and get vertex count
 				var cell_class: int = TransvoxelLUT.REG_CELL_CLASS[class_index]
@@ -545,6 +546,7 @@ func _apply_shift(pos: Vector3, mask: int) -> Vector3:
 
 ## Returns a normal of the scalar fields gradient at a specific world_vector
 func _get_field_normal(world_vector: Vector3) -> Vector3:
+	## TO DO: Replace .sample() with array look ups. We already have corner scalar values. Pass it into this function and use that instead.
 	# distance to measure along the scalar to get the gradient
 	var step := transition_slab_width
 	# get gradient of the scalar field at the given vectors position.
