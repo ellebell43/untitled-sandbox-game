@@ -295,7 +295,8 @@ func _load_new_chunks() -> void:
 		# if new chunk is in pending_chunk_set, update it's transition key, but do not regenerate it as it all pening chunks are working
 		elif pending_chunk_set.has(key):
 			var chunk: Chunk = pending_chunk_set.get(key)
-			chunk.desired_transition_mask = new_chunk_set.get(key)
+			if new_chunk_set.get(key):
+				chunk.desired_transition_mask = new_chunk_set.get(key)
 		# Otherwise, load the chunk for the first time
 		else:
 			_load_octree_chunk(Vector3i(key.x, key.y, key.z), key.w)
@@ -395,7 +396,8 @@ func _kill_dead_chunks() -> void:
 func _load_octree_chunk(chunk_pos: Vector3i, lod_step: int) -> void:
 	var new_chunk := Chunk.new(CHUNK_SIZE, noise, chunk_pos, lod_step)
 	var chunk_key := Vector4i(chunk_pos.x, chunk_pos.y, chunk_pos.z, lod_step)
-	new_chunk.desired_transition_mask = new_chunk_set.get(chunk_key)
+	if new_chunk_set.get(chunk_key):
+		new_chunk.desired_transition_mask = new_chunk_set.get(chunk_key)
 	self.add_child(new_chunk)
 	new_chunk.position = chunk_pos
 
