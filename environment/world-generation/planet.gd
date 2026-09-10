@@ -21,15 +21,17 @@ extends Node3D
 # | 14    | 262,144          | 261,144        |
 # | 15    | 524,288          | 523,288        |
 # | 20    | 16,777,216       | <- Earth is ~12,756,000
-## Defines the distance from the center of the world the sea level will be. Points below this level are "underwater", points above this level are "above water" (relative to world center). *REMINDER: world mesh diameter is roughly (ChunkManager.CHUNK_SIZE * 2^size) / 2*
-@export var sea_level: int = 520
+
 ## How quickly the planet rotates in radians/sec
-@export var rotation_speed := 0.04
+@export var rotation_speed := 0.004
 ## The axis that the planet spins on
 @export var rotation_axis := Vector3(randf(), randf(), randf()).normalized()
-
+## how far above/below the "floor_distance" the sea level should be
+@export var sea_level_modifier: int = 0
+@export var slope_curve: Curve
 ## Reference to the shape of the GravityArea Area3D node. Size is set to diameter * 2 in _ready()
 @onready var gravity_shape := $GravityArea/GravityShape
+@onready var default_slope: Curve = preload("res://environment/world-generation/slope_curves/default_slope.tres")
 
 ## Reference to the local ChunkManager for this planet.
 var chunk_manager: ChunkManager
@@ -52,8 +54,9 @@ func _ready() -> void:
 	floor_distance = (volume_length / 2) - 500
 	# gravity extends 1000m beyond the surface of the planet
 	gravity_shape.shape.radius = floor_distance + 1000
+	if slope_curve == null: slope_curve = default_slope
 	# initialize the world noise
-	world_noise = WorldNoise.new(world_seed, volume_length, sea_level)
+	world_noise = WorldNoise.new(world_seed, volume_length, floor_distance, sea_level_modifier, slope_curve)
 	# initialize the chunk_manager
 	chunk_manager = ChunkManager.new(player, world_seed, size, world_noise, is_current_world)
 	# set the chunk_manager position so that the planet mesh is center at the node origin
