@@ -28,10 +28,15 @@ extends Node3D
 @export var rotation_axis := Vector3(randf(), randf(), randf()).normalized()
 ## how far above/below the "floor_distance" the sea level should be
 @export var sea_level_modifier: int = 0
-@export var slope_curve: Curve
+
 ## Reference to the shape of the GravityArea Area3D node. Size is set to diameter * 2 in _ready()
 @onready var gravity_shape := $GravityArea/GravityShape
-@onready var default_slope: Curve = preload("res://environment/world-generation/slope_curves/default_slope.tres")
+## Curve the determines the overall shape of the land (continent shelves, beaches, deep ocean, etc.). Use to interpolate elevation from isovalue. Range should be [-1,1] and domain represents elevation
+@export var continent_curve: Curve
+## Curve that will apply the amplitude of the WorldNoise.mountain_noise. Domain is equivilent to elevation (value range of continent_curve), range is equivilent to noise amplitude to be applied (should be [0,1])
+@export var mountain_curve: Curve
+@onready var default_continent_curve: Curve = preload("res://environment/world-generation/slope_curves/default_continent_curve.tres")
+@onready var default_mountain_slope: Curve = preload("res://environment/world-generation/slope_curves/default_mountain_curve.tres")
 
 ## Reference to the local ChunkManager for this planet.
 var chunk_manager: ChunkManager
@@ -54,9 +59,17 @@ func _ready() -> void:
 	floor_distance = (volume_length / 2) - 500
 	# gravity extends 1000m beyond the surface of the planet
 	gravity_shape.shape.radius = floor_distance + 1000
-	if slope_curve == null: slope_curve = default_slope
+	if continent_curve == null: continent_curve = default_continent_curve
+	if mountain_curve == null: mountain_curve = default_mountain_slope
 	# initialize the world noise
-	world_noise = WorldNoise.new(world_seed, volume_length, floor_distance, sea_level_modifier, slope_curve)
+	world_noise = WorldNoise.new(
+		world_seed, 
+		volume_length, 
+		floor_distance, 
+		sea_level_modifier, 
+		continent_curve, 
+		mountain_curve
+	)
 	# initialize the chunk_manager
 	chunk_manager = ChunkManager.new(player, world_seed, size, world_noise, is_current_world)
 	# set the chunk_manager position so that the planet mesh is center at the node origin
