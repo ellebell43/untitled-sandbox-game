@@ -10,7 +10,11 @@ const LOOK_SENSITIVITY := 0.005
 const MAX_VELOCITY := Vector3(30, 30, 30)
 
 var fly_mode := true
-var current_world: Planet = null
+var current_world: Planet = null:
+	set(new_world):
+		current_world = new_world
+		if new_world != null:
+			new_world.is_current_world = true
 var allow_inputs := true
 
 @onready var camera: Camera3D = $Camera3D

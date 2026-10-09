@@ -47,6 +47,7 @@ text = "Gen Time"
 horizontal_alignment = 2
 
 [node name="UpdateGenTime" type="Timer" parent="." unique_id=893755423]
+wait_time = 0.25
 autostart = true
 
 [connection signal="timeout" from="UpdateGenTime" to="." method="_on_update_gen_time_timeout"]
