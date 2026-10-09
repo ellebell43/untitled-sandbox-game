@@ -1,7 +1,7 @@
 class_name Chunk
 extends Node3D
 
-@onready var wireframe_material := preload("res://test/wireframe-material.tres")
+@onready var wireframe_material := preload("res://assets/textures/wireframe-material.tres")
 
 # ============ DEBUG PROPERTIES ============
 
