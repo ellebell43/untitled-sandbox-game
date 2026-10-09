@@ -18,7 +18,6 @@ Untitled Sandbox Game: a voxel sandbox where an entire star system is one seamle
 - @docs/architecture.md: scene/node hierarchy, ownership, signals, seamless-system constraints
 - @docs/world-generation.md: noise, octree LOD, chunk lifecycle, transvoxel seams, perf notes
 - @docs/conventions.md: GDScript style and naming I follow
-- @docs/testing.md: GUT setup, how to run tests, current test state
 - @docs/learning-notes.md: what I already understand vs. what I'm learning (calibrate explanations)
 
 ## Commands
@@ -28,9 +27,11 @@ Set `GODOT_BIN` to the double-precision Godot 4.7 editor binary (the path is in 
 ```bash
 # run the game
 "$GODOT_BIN" --path .
-# run GUT unit tests headlessly
-"$GODOT_BIN" --headless --path . -s addons/gut/gut_cmdln.gd -gexit
 ```
+
+There is currently no test suite on this branch (GUT and `test/` were removed in `c731cb5`; `.gutconfig.json` remains). The wireframe debug material now lives in `assets/textures/` and `assets/shaders/`.
+
+Custom slash commands live in `.claude/commands/`: `/explain`, `/review`, `/optimize`, `/teach`.
 
 ## Layout
 
@@ -39,8 +40,8 @@ actors/        Player (CharacterBody3D) scene + script
 environment/   System scene/script; world-generation/ (Planet, ChunkManager, Chunk, WorldNoise, transvoxel LUT, slope_curves/)
 interface/     Start screen, debug overlay
 assets/ blender/   Art sources (human-made only)
-test/unit/     GUT tests; also wireframe debug material/shader
-addons/gut/    Third-party test framework. Never read or modify
+docs/          Topic docs (imported above)
+.claude/       Custom slash commands (and settings, if present)
 utils.gd       "Utils" autoload: global signals and the debug flag
 ```
 
@@ -48,5 +49,6 @@ utils.gd       "Utils" autoload: global signals and the debug flag
 
 - Work happens on feature branches; `master` is the main branch. Tracker is GitHub issues.
 - Every `.gd` has a committed `.uid` file. Don't suggest deleting them.
-- Ignore `.godot/` and `addons/gut/` when searching; they're generated/vendored.
+- Ignore `.godot/` when searching; it's generated.
+- `transvoxel-lut.gd` is ~900 lines of lookup tables. Don't read it unless the task is about it.
 - Collision layers: 1 = Player, 2 = Planet.

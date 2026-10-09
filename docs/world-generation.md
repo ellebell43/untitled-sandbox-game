@@ -40,6 +40,8 @@ ChunkManager keeps one dictionary per stage (`pending_`, `active_`, `retiring_`,
 
 - Lookup tables in `transvoxel-lut.gd` (large, vendored-style data. Don't read it unless the task is about it).
 - `Chunk.basis_table` and `BASIS_TABLE` enum map each of the 6 faces to U/V/N axes and plane.
+- Known gap: transition cells fix seams across *faces* only. Chunks of different LOD that share just a corner or edge can still leave cracks (issue #5).
+- `Chunk.wireframe_mode` swaps the chunk material for `assets/textures/wireframe-material.tres` (shader: `assets/shaders/wireframe.gdshader`). It's the debug view for inspecting seams.
 - Mask bit order: `x, y, z, -x, -y, -z` (bits 0–5).
 - `built_transition_mask` vs. `desired_transition_mask`: a chunk remeshes when they differ and it has no running task.
 
@@ -47,6 +49,8 @@ ChunkManager keeps one dictionary per stage (`pending_`, `active_`, `retiring_`,
 
 - The ChunkManager keeps per-stage microsecond timers (`get_timing_snapshot()`), shown by the debug overlay. Measure before optimizing.
 - Mesh generation is off-thread; mesh *building* and the retire/kill passes run on the main thread. Main-thread cost is the usual bottleneck.
-- `_load_new_chunks()` repeats the "spawn a generate_mesh_data task" block four times; a candidate for consolidation (a refactor I should do myself).
+- `_load_new_chunks()` repeats the "spawn a generate_mesh_data task" block four times (plus once in `_load_octree_chunk`); a candidate for consolidation (a refactor I should do myself).
+- `_find_masks()` runs on a worker thread while reading `new_chunk_set`, which the main thread clears and refills in `_process`. Guarded only by the single `find_masks_task` handle, so worth reviewing for races.
+- `Chunk.generate_mesh_data()` returns early for empty cells (`_determine_if_cell_is_empty`), so many chunks have `mesh_data == null` and never build a mesh.
 - Non-current planets only keep a single root chunk (cheap), but check the transition when a planet becomes current.
 - Scale: planets up to size 19 are allowed; large sizes stress float precision, which is why the project uses the double-precision Godot build.

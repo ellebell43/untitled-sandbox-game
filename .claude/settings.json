@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit(CLAUDE.md)",
+      "Edit(docs/**)",
+      "Edit(.claude/commands/**)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)"
+    ],
+    "deny": [
+      "Edit(**/*.gd)",
+      "Edit(**/*.tscn)",
+      "Edit(**/*.tres)",
+      "Edit(**/*.res)",
+      "Edit(**/*.gdshader)",
+      "Edit(**/*.gdshaderinc)",
+      "Edit(**/*.godot)",
+      "Edit(**/*.cfg)",
+      "Edit(**/*.import)",
+      "Edit(**/*.uid)",
+      "Edit(.gutconfig.json)",
+      "Edit(.claude/settings.json)",
+      "Edit(.claude/settings.local.json)",
+      "Read(.godot/**)",
+      "Bash(sed -i:*)",
+      "Bash(perl -i:*)",
+      "Bash(tee:*)",
+      "Bash(truncate:*)"
+    ]
+  }
+}
